@@ -18,15 +18,28 @@ export default function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const email = form.email.trim().toLowerCase();
+    const username = form.username.trim();
+
+    if (!email) { setError('Email is required'); return; }
+    if (!username) { setError('Username is required'); return; }
     if (form.password !== form.confirm) { setError('Passwords do not match'); return; }
     if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      setError('Username must be 3-20 characters and use only letters, numbers, or underscores');
+      return;
+    }
     setLoading(true);
     try {
-      const result = await signup(form.email, form.username, form.password);
+      const result = await signup(email, username, form.password);
       clearGuestDocs();
       setRecoveryWords(result.recoveryWords);
     } catch (err) {
-      setError(err.response?.data?.error || 'Signup failed');
+      if (err?.response?.status === 500) {
+        setError('Server configuration error. Check JWT_SECRET and DATABASE_URL on the server.');
+      } else {
+        setError(err.response?.data?.error || 'Signup failed');
+      }
     } finally {
       setLoading(false);
     }

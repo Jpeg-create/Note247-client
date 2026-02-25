@@ -9,6 +9,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -16,21 +17,25 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchDocs = async () => {
+    setError('');
     try {
       const res = await api.get('/docs');
       setDocs(res.data.documents);
     } catch (err) {
-      console.error(err);
+      setError(err?.response?.data?.error || 'Could not load documents.');
     } finally {
       setLoading(false);
     }
   };
 
   const newDoc = async () => {
+    setError('');
     try {
       const res = await api.post('/docs', { title: 'Untitled', content: '', language: 'plaintext' });
       navigate(`/s/${res.data.document.short_id}`);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Could not create a new document.');
+    }
   };
 
   const deleteDoc = async (shortId) => {
@@ -38,7 +43,9 @@ export default function Dashboard() {
     try {
       await api.delete(`/docs/${shortId}`);
       setDocs(d => d.filter(doc => doc.short_id !== shortId));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Could not delete document.');
+    }
   };
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -60,6 +67,7 @@ export default function Dashboard() {
           <h1>My Documents</h1>
           <button className="btn accent" onClick={newDoc}>+ New Document</button>
         </div>
+        {error && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
 
         {loading ? (
           <div className={styles.empty}>Loading…</div>

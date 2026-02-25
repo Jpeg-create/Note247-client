@@ -16,13 +16,22 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const email = form.email.trim().toLowerCase();
+    if (!email || !form.password) {
+      setError('Email and password are required');
+      return;
+    }
     setLoading(true);
     try {
-      await login(form.email, form.password);
+      await login(email, form.password);
       clearGuestDocs();
       navigate(params.get('redirect') || '/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      if (err?.response?.status === 500) {
+        setError('Server configuration error. Check JWT_SECRET and DATABASE_URL on the server.');
+      } else {
+        setError(err.response?.data?.error || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }

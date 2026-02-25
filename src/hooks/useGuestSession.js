@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const GUEST_LIMIT = parseInt(import.meta.env.VITE_GUEST_DOC_LIMIT || '3');

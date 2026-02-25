@@ -27,12 +27,7 @@ export default function Login() {
       clearGuestDocs();
       navigate(params.get('redirect') || '/dashboard');
     } catch (err) {
-      setError(
-        err?.response?.data?.detail ||
-        err?.response?.data?.hint ||
-        err?.response?.data?.error ||
-        'Login failed'
-      );
+      setError(err?.message || 'Login failed');
     } finally {
       setLoading(false);
     }

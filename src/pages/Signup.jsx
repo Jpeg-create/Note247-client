@@ -35,12 +35,7 @@ export default function Signup() {
       clearGuestDocs();
       setRecoveryWords(result.recoveryWords);
     } catch (err) {
-      setError(
-        err?.response?.data?.detail ||
-        err?.response?.data?.hint ||
-        err?.response?.data?.error ||
-        'Signup failed'
-      );
+      setError(err?.message || 'Signup failed');
     } finally {
       setLoading(false);
     }

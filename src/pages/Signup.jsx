@@ -35,11 +35,12 @@ export default function Signup() {
       clearGuestDocs();
       setRecoveryWords(result.recoveryWords);
     } catch (err) {
-      if (err?.response?.status === 500) {
-        setError('Server configuration error. Check JWT_SECRET and DATABASE_URL on the server.');
-      } else {
-        setError(err.response?.data?.error || 'Signup failed');
-      }
+      setError(
+        err?.response?.data?.detail ||
+        err?.response?.data?.hint ||
+        err?.response?.data?.error ||
+        'Signup failed'
+      );
     } finally {
       setLoading(false);
     }

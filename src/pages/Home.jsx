@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSession } from '../hooks/useGuestSession';
-import api from '../utils/api';
+import api, { getApiErrorMessage } from '../utils/api';
 import styles from './Home.module.css';
 
 export default function Home() {
@@ -29,10 +29,7 @@ export default function Home() {
         navigate('/signup?reason=limit');
         return;
       }
-      setActionError(
-        err?.response?.data?.error ||
-        'Could not create a new document. Check server settings and try again.'
-      );
+      setActionError(getApiErrorMessage(err, 'Could not create a new document. Check server settings and try again.'));
     }
   };
 

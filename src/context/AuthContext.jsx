@@ -25,7 +25,9 @@ export const AuthProvider = ({ children }) => {
       setUser(JSON.parse(savedUser));
       api.get('/auth/me')
         .then(res => setUser(res.data.user))
-        .catch(() => logout())
+        .catch((err) => {
+          if (err?.response?.status === 401) logout();
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);

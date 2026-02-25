@@ -5,6 +5,13 @@ const api = axios.create({
   timeout: 10000,
 });
 
+export const getApiErrorMessage = (err, fallback = 'Request failed') =>
+  err?.response?.data?.detail ||
+  err?.response?.data?.hint ||
+  err?.response?.data?.error ||
+  err?.message ||
+  fallback;
+
 // Attach JWT + guest token to every request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('nf_token');
@@ -21,7 +28,12 @@ api.interceptors.response.use(
     if (newToken) localStorage.setItem('nf_guest', newToken);
     return res;
   },
-  err => Promise.reject(err)
+  err => {
+    if (!err.response && err.code === 'ECONNABORTED') {
+      err.message = 'Request timed out. Please try again.';
+    }
+    return Promise.reject(err);
+  }
 );
 
 export default api;

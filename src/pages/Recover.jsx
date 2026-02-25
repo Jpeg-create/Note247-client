@@ -24,7 +24,13 @@ export default function Recover() {
       await recoverAccount(email, recoveryKey, newPassword);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message || err.response?.data?.error || 'Recovery failed');
+      setError(
+        err?.response?.data?.detail ||
+        err?.response?.data?.hint ||
+        err?.response?.data?.error ||
+        err.message ||
+        'Recovery failed'
+      );
     } finally {
       setLoading(false);
     }

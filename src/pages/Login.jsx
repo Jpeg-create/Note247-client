@@ -27,11 +27,12 @@ export default function Login() {
       clearGuestDocs();
       navigate(params.get('redirect') || '/dashboard');
     } catch (err) {
-      if (err?.response?.status === 500) {
-        setError('Server configuration error. Check JWT_SECRET and DATABASE_URL on the server.');
-      } else {
-        setError(err.response?.data?.error || 'Login failed');
-      }
+      setError(
+        err?.response?.data?.detail ||
+        err?.response?.data?.hint ||
+        err?.response?.data?.error ||
+        'Login failed'
+      );
     } finally {
       setLoading(false);
     }

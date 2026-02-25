@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
+import api, { getApiErrorMessage } from '../utils/api';
 import styles from './Dashboard.module.css';
 
 export default function Dashboard() {
@@ -22,7 +22,7 @@ export default function Dashboard() {
       const res = await api.get('/docs');
       setDocs(res.data.documents);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Could not load documents.');
+      setError(getApiErrorMessage(err, 'Could not load documents.'));
     } finally {
       setLoading(false);
     }
@@ -34,7 +34,7 @@ export default function Dashboard() {
       const res = await api.post('/docs', { title: 'Untitled', content: '', language: 'plaintext' });
       navigate(`/s/${res.data.document.short_id}`);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Could not create a new document.');
+      setError(getApiErrorMessage(err, 'Could not create a new document.'));
     }
   };
 
@@ -44,7 +44,7 @@ export default function Dashboard() {
       await api.delete(`/docs/${shortId}`);
       setDocs(d => d.filter(doc => doc.short_id !== shortId));
     } catch (err) {
-      setError(err?.response?.data?.error || 'Could not delete document.');
+      setError(getApiErrorMessage(err, 'Could not delete document.'));
     }
   };
 

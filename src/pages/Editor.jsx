@@ -7,8 +7,7 @@ import { useEncryption } from '../hooks/useEncryption';
 import api from '../utils/api';
 import CodeMirrorEditor from '../components/CodeMirrorEditor';
 import VersionsModal from '../components/VersionsModal';
-import { ShareModal } from '../components/ShareModal';
-import { PasswordModal } from '../components/ShareModal';
+import { ShareModal, PasswordModal } from '../components/ShareModal';
 import GuestLimitBanner from '../components/GuestLimitBanner';
 import styles from './Editor.module.css';
 
@@ -33,7 +32,7 @@ export default function Editor() {
   const { shortId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isGuest, limitReached } = useGuestSession();
+  const { isGuest } = useGuestSession();
   const { encrypt, decrypt, isEncryptionActive } = useEncryption();
   const token = localStorage.getItem('nf_token');
 
@@ -56,22 +55,29 @@ export default function Editor() {
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [charCount, setCharCount] = useState(0);
   const [lineCount, setLineCount] = useState(1);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const autoSaveTimer = useRef(null);
   const isRemoteChange = useRef(false);
+  const mobileMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target))
+        setMobileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, []);
 
   const { connected, emitChange, emitSave } = useSocket({
     shortId: shortId || doc?.short_id,
-    token,
-    password: docPassword,
+    token, password: docPassword,
     onDocChange: async (state) => {
       if (state.content !== undefined) {
-        // Decrypt incoming content before displaying
         const plain = await decrypt(state.content);
-        if (plain !== content) {
-          isRemoteChange.current = true;
-          setContent(plain);
-        }
+        if (plain !== content) { isRemoteChange.current = true; setContent(plain); }
       }
       if (state.language) setLanguage(state.language);
       if (state.title) setTitle(state.title);
@@ -95,7 +101,6 @@ export default function Editor() {
       const res = await api.get(`/docs/${shortId}${params}`);
       const d = res.data.document;
       setDoc(d);
-      // Decrypt content before showing
       const plain = await decrypt(d.content);
       setContent(plain);
       setCharCount(plain.length);
@@ -125,25 +130,17 @@ export default function Editor() {
     if (!sid) return;
     setSaveStatus('saving');
     try {
-      // Encrypt before sending to server
       const encryptedContent = await encrypt(content);
       if (user) {
-        // Emit encrypted content over socket
         emitSave(saveVersion);
-        // Also persist via REST to ensure DB is updated
-        await api.put(`/docs/${sid}`, {
-          content: encryptedContent,
-          title,
-          language,
-          saveVersion,
-        });
+        await api.put(`/docs/${sid}`, { content: encryptedContent, title, language, saveVersion });
       } else {
         await api.put(`/docs/${sid}`, { content: encryptedContent, title, language });
       }
       setSaveStatus('saved');
       setLastSaved(new Date());
       if (saveVersion) addToast('✅ Version saved!', 'success');
-    } catch (err) {
+    } catch {
       setSaveStatus('unsaved');
       addToast('❌ Save failed', 'error');
     }
@@ -154,9 +151,6 @@ export default function Editor() {
     setContent(val);
     setCharCount(val.length);
     setLineCount(val.split('\n').length);
-    // Emit PLAINTEXT to collaborators (they decrypt with their own keys)
-    // For true multi-user E2EE collab, all users would need the same shared key
-    // — for now, collab docs are unencrypted (guest mode), user docs are E2EE
     emitChange({ content: val, language, title });
     scheduleAutoSave();
   };
@@ -183,6 +177,7 @@ export default function Editor() {
     a.click();
     URL.revokeObjectURL(a.href);
     addToast('💾 Downloaded!', 'success');
+    setMobileMenuOpen(false);
   };
 
   const addToast = (msg, type = 'success') => {
@@ -191,7 +186,7 @@ export default function Editor() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
   };
 
-  const statusText = { saved: 'Saved', saving: 'Saving…', unsaved: 'Unsaved changes' };
+  const statusText = { saved: 'Saved', saving: 'Saving…', unsaved: 'Unsaved' };
 
   if (passwordRequired) {
     return (
@@ -202,9 +197,8 @@ export default function Editor() {
           <p>This document requires a password to view.</p>
           <input className="form-input" type="password" placeholder="Enter password…"
             value={pwInput} onChange={e => setPwInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') setDocPassword(pwInput); }}
-            autoFocus />
-          <button className="btn accent" onClick={() => setDocPassword(pwInput)}>Unlock</button>
+            onKeyDown={e => { if (e.key === 'Enter') setDocPassword(pwInput); }} autoFocus />
+          <button className="btn accent" style={{ marginTop: 8 }} onClick={() => setDocPassword(pwInput)}>Unlock</button>
         </div>
       </div>
     );
@@ -213,7 +207,7 @@ export default function Editor() {
   if (loading) {
     return (
       <div className={styles.loading}>
-        <div className={styles.loadingSpinner}></div>
+        <div className={styles.loadingSpinner} />
         <span>Loading document…</span>
       </div>
     );
@@ -222,53 +216,92 @@ export default function Editor() {
   return (
     <div className={`${styles.editorPage} ${isDark ? '' : 'light'}`}>
       <header className={styles.toolbar}>
-        <div className={styles.logoSmall} onClick={() => navigate(user ? '/dashboard' : '/')}>N<span>247</span></div>
-        <div className={styles.sep} />
-        <input ref={null} className={styles.titleInput} value={title}
-          onChange={e => handleTitleChange(e.target.value)} placeholder="Untitled" spellCheck={false} />
-        <div className={styles.sep} />
-        <select className={styles.langSelect} value={language} onChange={e => handleLangChange(e.target.value)}>
-          {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-        </select>
-        <div className={styles.sep} />
-        <button className="btn sm ghost" onClick={() => doSave(true)}>💾 Save</button>
-        <button className="btn sm ghost" onClick={handleExport}>↓ Export</button>
-        <div className="spacer" />
-
-        {/* E2EE indicator */}
-        {isEncryptionActive && (
-          <div className={styles.e2eeIndicator} title="End-to-end encrypted">
-            🔐 E2EE
+        {/* Left group: logo + title */}
+        <div className={styles.toolbarLeft}>
+          <div className={styles.logoSmall} onClick={() => navigate(user ? '/dashboard' : '/')}>
+            N<span>247</span>
           </div>
-        )}
+          <div className={styles.sep} />
+          <input
+            className={styles.titleInput}
+            value={title}
+            onChange={e => handleTitleChange(e.target.value)}
+            placeholder="Untitled"
+            spellCheck={false}
+          />
+        </div>
 
-        {collaborators.length > 0 && (
-          <div className={styles.collaborators}>
-            {collaborators.slice(0, 4).map(c => (
-              <div key={c.socketId} className={styles.avatar} title={c.username}>
-                {c.username[0].toUpperCase()}
+        {/* Desktop only: lang + actions */}
+        <div className={styles.desktopActions}>
+          <select className={styles.langSelect} value={language} onChange={e => handleLangChange(e.target.value)}>
+            {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+          </select>
+          <div className={styles.sep} />
+          <button className="btn sm ghost" onClick={() => doSave(true)}>💾 Save</button>
+          <button className="btn sm ghost" onClick={handleExport}>↓ Export</button>
+          <div className="spacer" />
+          {isEncryptionActive && <div className={styles.e2eeIndicator} title="E2EE active">🔐</div>}
+          {collaborators.length > 0 && (
+            <div className={styles.collaborators}>
+              {collaborators.slice(0, 3).map(c => (
+                <div key={c.socketId} className={styles.avatar} title={c.username}>
+                  {c.username[0].toUpperCase()}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className={`${styles.connDot} ${connected ? styles.connGreen : styles.connRed}`} title={connected ? 'Connected' : 'Disconnected'} />
+          <button className="btn sm ghost" onClick={() => setShowVersions(true)}>🕑 History</button>
+          <button className="btn sm ghost" onClick={() => setShowPasswordModal(true)}>🔒</button>
+          <button className="btn sm ghost" onClick={() => setShowShare(true)}>🔗 Share</button>
+          <button className="btn sm ghost" onClick={() => setIsDark(d => !d)}>{isDark ? '☀️' : '🌙'}</button>
+          {!user && <button className="btn sm accent" onClick={() => navigate('/signup')}>Sign Up</button>}
+        </div>
+
+        {/* Mobile only: save + hamburger */}
+        <div className={styles.mobileActions}>
+          <div className={`${styles.connDot} ${connected ? styles.connGreen : styles.connRed}`} />
+          <button className="btn sm ghost" onClick={() => doSave(true)}>💾</button>
+          <div className={styles.mobileMenuWrap} ref={mobileMenuRef}>
+            <button className="btn sm ghost" onClick={() => setMobileMenuOpen(o => !o)} aria-label="Menu">
+              ☰
+            </button>
+            {mobileMenuOpen && (
+              <div className={styles.mobileMenu}>
+                <div className={styles.mobileMenuSection}>
+                  <span className={styles.mobileMenuLabel}>Language</span>
+                  <select className={styles.langSelect} value={language}
+                    onChange={e => { handleLangChange(e.target.value); setMobileMenuOpen(false); }}
+                    style={{ width: '100%', marginTop: 6 }}>
+                    {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  </select>
+                </div>
+                <div className={styles.mobileMenuDivider} />
+                <button className={styles.mobileMenuItem} onClick={() => { setShowVersions(true); setMobileMenuOpen(false); }}>🕑 Version History</button>
+                <button className={styles.mobileMenuItem} onClick={() => { setShowShare(true); setMobileMenuOpen(false); }}>🔗 Share Link</button>
+                <button className={styles.mobileMenuItem} onClick={() => { setShowPasswordModal(true); setMobileMenuOpen(false); }}>🔒 Set Password</button>
+                <button className={styles.mobileMenuItem} onClick={handleExport}>↓ Export File</button>
+                <div className={styles.mobileMenuDivider} />
+                <button className={styles.mobileMenuItem} onClick={() => { setIsDark(d => !d); setMobileMenuOpen(false); }}>
+                  {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                </button>
+                {!user && (
+                  <button className={`${styles.mobileMenuItem} ${styles.mobileMenuAccent}`} onClick={() => navigate('/signup')}>
+                    Sign Up Free →
+                  </button>
+                )}
+                {isEncryptionActive && <div className={styles.mobileMenuE2ee}>🔐 End-to-end encrypted</div>}
               </div>
-            ))}
+            )}
           </div>
-        )}
-
-        <div className={`${styles.connDot} ${connected ? styles.connGreen : styles.connRed}`}
-          title={connected ? 'Connected' : 'Disconnected'} />
-
-        <button className="btn sm ghost" onClick={() => setShowVersions(true)}>🕑 History</button>
-        <button className="btn sm ghost" onClick={() => setShowPasswordModal(true)}>🔒</button>
-        <button className="btn sm ghost" onClick={() => setShowShare(true)}>🔗 Share</button>
-        <button className="btn sm ghost" onClick={() => setIsDark(d => !d)}>{isDark ? '☀️' : '🌙'}</button>
-        {!user && <button className="btn sm accent" onClick={() => navigate('/signup')}>Sign Up</button>}
+        </div>
       </header>
 
       {isGuest && <GuestLimitBanner onSignup={() => navigate('/signup')} />}
 
       <div className={styles.editorArea}>
         <CodeMirrorEditor
-          value={content}
-          language={language}
-          isDark={isDark}
+          value={content} language={language} isDark={isDark}
           onChange={handleContentChange}
           onCursorChange={({ line, col }) => setCursor({ line, col })}
         />
@@ -280,15 +313,13 @@ export default function Editor() {
           {lastSaved && saveStatus === 'saved' && ` · ${lastSaved.toLocaleTimeString()}`}
         </span>
         <span className={styles.sep2} />
-        <span>Ln {cursor.line}, Col {cursor.col}</span>
-        <span className={styles.sep2} />
-        <span>{charCount} chars · {lineCount} lines</span>
+        <span className={styles.hideOnMobile}>Ln {cursor.line}, Col {cursor.col}</span>
+        <span className={`${styles.sep2} ${styles.hideOnMobile}`} />
+        <span className={styles.hideOnMobile}>{charCount} chars · {lineCount} lines</span>
         <div className="spacer" />
-        {isEncryptionActive && <span style={{ color: 'var(--accent2)', fontWeight: 600 }}>🔐 Encrypted</span>}
+        {isEncryptionActive && <span className={styles.encryptBadge}>🔐 E2EE</span>}
         <span className={styles.sep2} />
         <span>{LANGS.find(l => l.value === language)?.label || language}</span>
-        <span className={styles.sep2} />
-        <span>UTF-8</span>
       </footer>
 
       {showVersions && (
@@ -298,26 +329,20 @@ export default function Editor() {
             setContent(plain); setTitle(v.title); setLanguage(v.language);
             scheduleAutoSave(); setShowVersions(false); addToast('✅ Version restored');
           }}
-          onClose={() => setShowVersions(false)}
-        />
+          onClose={() => setShowVersions(false)} />
       )}
       {showShare && (
         <ShareModal shortId={shortId || doc?.short_id} title={title}
-          onClose={() => setShowShare(false)}
-          onCopy={() => addToast('🔗 Link copied!')}
-        />
+          onClose={() => setShowShare(false)} onCopy={() => addToast('🔗 Link copied!')} />
       )}
       {showPasswordModal && (
         <PasswordModal shortId={shortId || doc?.short_id} hasPassword={doc?.hasPassword}
           onClose={() => setShowPasswordModal(false)}
-          onSaved={() => { addToast('🔒 Password updated'); setShowPasswordModal(false); }}
-        />
+          onSaved={() => { addToast('🔒 Password updated'); setShowPasswordModal(false); }} />
       )}
 
       <div className="toast-container">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
-        ))}
+        {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}
       </div>
     </div>
   );

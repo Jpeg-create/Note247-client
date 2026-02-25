@@ -176,3 +176,19 @@
     padding: 10px 12px;
   }
 }
+
+@media (max-width: 480px) {
+  .wordGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .card {
+    padding: 24px 16px;
+  }
+  .actions {
+    flex-direction: column;
+  }
+  .actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}

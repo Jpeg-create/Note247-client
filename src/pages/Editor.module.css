@@ -1,5 +1,5 @@
 .editorPage {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -7,7 +7,7 @@
 }
 
 .toolbar {
-  height: 52px;
+  min-height: 52px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -45,6 +45,7 @@
   padding: 5px 10px;
   outline: none;
   min-width: 120px;
+  width: min(220px, 38vw);
   max-width: 220px;
   transition: border-color 0.15s;
 }
@@ -100,7 +101,7 @@
 }
 
 .statusBar {
-  height: 28px;
+  min-height: 28px;
   background: var(--bg2);
   border-top: 1px solid var(--border);
   display: flex;
@@ -111,7 +112,11 @@
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.statusBar::-webkit-scrollbar { display: none; }
 .sep2 { width: 1px; height: 14px; background: var(--border); }
 .saveStatus { font-weight: 600; }
 .saved { color: var(--accent2); }
@@ -120,18 +125,19 @@
 
 /* Lock screen */
 .lockScreen {
-  height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
 }
 .lockCard {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 40px;
-  width: 360px;
+  width: min(100%, 420px);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -144,7 +150,7 @@
 
 /* Loading */
 .loading {
-  height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -176,4 +182,29 @@
   border: 1px solid rgba(71,255,184,0.2);
   border-radius: 20px;
   flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .titleInput {
+    width: min(180px, 42vw);
+    min-width: 100px;
+  }
+
+  .langSelect {
+    max-width: 120px;
+  }
+
+  .statusBar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .lockCard {
+    padding: 22px 16px;
+  }
 }

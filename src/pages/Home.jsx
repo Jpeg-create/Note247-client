@@ -76,16 +76,16 @@ export default function Home() {
           )}
         </div>
 
-        {actionError && <div className="form-error">{actionError}</div>}
+        {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
         <div className={styles.features}>
           {[
-            { icon: 'Realtime', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly.' },
-            { icon: 'Lock', title: 'Password Protection', desc: 'Lock your documents with a password.' },
-            { icon: 'History', title: 'Version History', desc: 'Never lose work and restore any previous version.' },
-            { icon: 'Link', title: 'Short Share URLs', desc: 'Share docs with a clean short link.' },
-            { icon: 'Theme', title: 'Dark and Light Mode', desc: 'Easy on the eyes, day or night.' },
-            { icon: 'Export', title: 'Export Files', desc: 'Download your work in any format.' },
+            { icon: 'LIVE', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly.' },
+            { icon: 'LOCK', title: 'Password Protection', desc: 'Lock your documents with a password.' },
+            { icon: 'HIST', title: 'Version History', desc: 'Never lose work and restore any previous version.' },
+            { icon: 'LINK', title: 'Short Share URLs', desc: 'Share docs with a clean short link.' },
+            { icon: 'THEME', title: 'Dark and Light Mode', desc: 'Easy on the eyes, day or night.' },
+            { icon: 'FILE', title: 'Export Files', desc: 'Download your work in any format.' },
           ].map(f => (
             <div className={styles.featureCard} key={f.title}>
               <div className={styles.featureIcon}>{f.icon}</div>

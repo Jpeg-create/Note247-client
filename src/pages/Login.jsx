@@ -42,7 +42,7 @@ export default function Login() {
 
         {params.get('reason') === 'limit' && (
           <div className={styles.limitBanner}>
-            🔒 You've reached the guest document limit. Sign in to continue.
+            Guest document limit reached. Sign in to continue.
           </div>
         )}
 
@@ -54,7 +54,8 @@ export default function Login() {
               type="email"
               placeholder="you@example.com"
               value={form.email}
-              onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              autoComplete="email"
               required
             />
           </div>
@@ -63,20 +64,21 @@ export default function Login() {
             <input
               className="form-input"
               type="password"
-              placeholder="••••••••"
+              placeholder="Your password"
               value={form.password}
-              onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+              autoComplete="current-password"
               required
             />
           </div>
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
           <button className="btn accent" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <p className={styles.switchLink}>
-          Don't have an account? <Link to="/signup">Sign up free</Link>
+          Do not have an account? <Link to="/signup">Sign up free</Link>
         </p>
       </div>
     </div>

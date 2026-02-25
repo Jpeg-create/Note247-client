@@ -6,7 +6,6 @@ import styles from './Auth.module.css';
 export default function Recover() {
   const navigate = useNavigate();
   const { recoverAccount } = useAuth();
-  const [step, setStep] = useState(1); // 1=email, 2=key+newpw
   const [email, setEmail] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -17,18 +16,31 @@ export default function Recover() {
   const handleRecover = async (e) => {
     e.preventDefault();
     setError('');
-    if (newPassword !== confirm) { setError('Passwords do not match'); return; }
-    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Email is required');
+      return;
+    }
+    if (newPassword !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     setLoading(true);
     try {
-      await recoverAccount(email, recoveryKey, newPassword);
+      await recoverAccount(normalizedEmail, recoveryKey, newPassword);
       navigate('/dashboard');
     } catch (err) {
       setError(
         err?.response?.data?.detail ||
         err?.response?.data?.hint ||
         err?.response?.data?.error ||
-        err.message ||
+        err?.message ||
         'Recovery failed'
       );
     } finally {
@@ -43,23 +55,37 @@ export default function Recover() {
         <h1 className={styles.title}>Recover Account</h1>
         <p className={styles.sub}>Use your 24-word recovery key to regain access.</p>
 
-        <div className={styles.e2eeBadge} style={{ background: 'rgba(232,255,71,0.08)', borderColor: 'rgba(232,255,71,0.2)', color: 'var(--accent)' }}>
-          ℹ️ Your notes remain intact — your recovery key unlocks them without needing your old password.
+        <div
+          className={styles.e2eeBadge}
+          style={{
+            background: 'rgba(232,255,71,0.08)',
+            borderColor: 'rgba(232,255,71,0.2)',
+            color: 'var(--accent)',
+          }}
+        >
+          Your notes remain intact. The recovery key unlocks them without your old password.
         </div>
 
         <form onSubmit={handleRecover}>
           <div className="form-group">
             <label className="form-label">Email Address</label>
-            <input className="form-input" type="email" placeholder="you@example.com"
-              value={email} onChange={e => setEmail(e.target.value)} required />
+            <input
+              className="form-input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Recovery Key (24 words)</label>
             <textarea
               className="form-input"
-              placeholder="word1 word2 word3 … word24"
+              placeholder="word1 word2 word3 ... word24"
               value={recoveryKey}
-              onChange={e => setRecoveryKey(e.target.value)}
+              onChange={(e) => setRecoveryKey(e.target.value)}
               rows={4}
               style={{ resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13 }}
               required
@@ -70,17 +96,31 @@ export default function Recover() {
           </div>
           <div className="form-group">
             <label className="form-label">New Password</label>
-            <input className="form-input" type="password" placeholder="Min. 8 characters"
-              value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+            <input
+              className="form-input"
+              type="password"
+              placeholder="Min. 8 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Confirm New Password</label>
-            <input className="form-input" type="password" placeholder="••••••••"
-              value={confirm} onChange={e => setConfirm(e.target.value)} required />
+            <input
+              className="form-input"
+              type="password"
+              placeholder="Repeat your new password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
           </div>
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error" role="alert">{error}</div>}
           <button className="btn accent" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-            {loading ? 'Verifying recovery key…' : 'Recover Account'}
+            {loading ? 'Verifying recovery key...' : 'Recover Account'}
           </button>
         </form>
         <p className={styles.switchLink}>

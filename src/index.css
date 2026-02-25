@@ -37,8 +37,13 @@ body {
   font-family: var(--font-ui);
   background: var(--bg);
   color: var(--text);
-  overflow: hidden;
-  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 /* Buttons */
@@ -157,3 +162,29 @@ body {
 .badge.green { background: rgba(71,255,184,0.15); color: var(--accent2); }
 .badge.yellow { background: rgba(232,255,71,0.15); color: var(--accent); }
 .badge.red { background: rgba(255,107,157,0.15); color: var(--accent3); }
+
+@media (max-width: 640px) {
+  .btn {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+
+  .btn.lg {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal {
+    width: min(95vw, 420px);
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

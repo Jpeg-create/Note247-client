@@ -1,0 +1,11 @@
+.toast {
+  position: fixed; bottom: 32px; right: 24px; z-index: 500;
+  padding: 11px 20px; border-radius: var(--radius);
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow); border: 1px solid;
+  animation: slideUp 0.2s ease;
+}
+@keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+.info { background: var(--bg2); border-color: var(--accent); color: var(--accent); }
+.success { background: var(--bg2); border-color: var(--accent2); color: var(--accent2); }
+.error { background: var(--bg2); border-color: var(--danger); color: var(--danger); }

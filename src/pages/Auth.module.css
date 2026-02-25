@@ -1,0 +1,78 @@
+.authPage {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.authCard {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+}
+
+.logo {
+  display: inline-block;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+  text-decoration: none;
+  margin-bottom: 28px;
+  letter-spacing: -0.5px;
+}
+.logo span { color: var(--text); }
+
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.sub {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 28px;
+}
+
+.switchLink {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 20px;
+  text-align: center;
+}
+.switchLink a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.switchLink a:hover { text-decoration: underline; }
+
+.limitBanner {
+  background: rgba(232,255,71,0.1);
+  border: 1px solid rgba(232,255,71,0.3);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.e2eeBadge {
+  background: rgba(255,107,157,0.08);
+  border: 1px solid rgba(255,107,157,0.2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--accent3);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}

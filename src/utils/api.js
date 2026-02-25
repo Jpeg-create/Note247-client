@@ -5,12 +5,23 @@ const api = axios.create({
   timeout: 10000,
 });
 
-export const getApiErrorMessage = (err, fallback = 'Request failed') =>
-  err?.response?.data?.detail ||
-  err?.response?.data?.hint ||
-  err?.response?.data?.error ||
-  err?.message ||
-  fallback;
+export const getApiErrorMessage = (err, fallback = 'Request failed') => {
+  const message =
+    err?.response?.data?.detail ||
+    err?.response?.data?.hint ||
+    err?.response?.data?.error ||
+    err?.message ||
+    fallback;
+
+  if (typeof message === 'string') {
+    const lower = message.toLowerCase();
+    if (lower.includes('key.usages') || lower.includes('usages does not permit')) {
+      return 'Encryption key setup failed in the browser. Refresh the page and try again.';
+    }
+  }
+
+  return message;
+};
 
 // Attach JWT + guest token to every request
 api.interceptors.request.use(config => {

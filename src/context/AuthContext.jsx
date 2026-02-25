@@ -38,7 +38,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const keySalt = generateSalt();
       const recoverySalt = generateSalt();
-      const encryptionKey = await deriveKeyFromPassword(password, keySalt);
+      const encryptionKey = await deriveKeyFromPassword(password, keySalt, {
+        usages: ['encrypt', 'decrypt'],
+        extractable: true,
+      });
       const { words: recoveryWords } = generateRecoveryKey();
       const backupKey = await deriveKeyFromRecoveryWords(recoveryWords, recoverySalt);
       const wrappedKey = await wrapKey(encryptionKey, backupKey);
@@ -65,7 +68,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const saltRes = await api.get(`/auth/salt?email=${encodeURIComponent(email)}`);
       const { keySalt } = saltRes.data;
-      const encryptionKey = await deriveKeyFromPassword(password, keySalt);
+      const encryptionKey = await deriveKeyFromPassword(password, keySalt, {
+        usages: ['encrypt', 'decrypt'],
+        extractable: true,
+      });
       const res = await api.post('/auth/login', { email, password });
       localStorage.setItem('nf_token', res.data.token);
       localStorage.setItem('nf_user', JSON.stringify(res.data.user));
@@ -92,7 +98,10 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid recovery key. Please check and try again.');
       }
       const newKeySalt = generateSalt();
-      const newBackupKey = await deriveKeyFromPassword(newPassword, newKeySalt);
+      const newBackupKey = await deriveKeyFromPassword(newPassword, newKeySalt, {
+        usages: ['wrapKey', 'unwrapKey'],
+        extractable: true,
+      });
       const newWrappedKey = await wrapKey(encryptionKey, newBackupKey);
       const updateRes = await api.post('/auth/recover', {
         email, newPassword, newKeySalt, newWrappedKey,

@@ -13,7 +13,9 @@
  * Derives a 256-bit AES key from a password + salt using PBKDF2.
  * The derived key is used to encrypt/decrypt note content.
  */
-export async function deriveKeyFromPassword(password, salt) {
+export async function deriveKeyFromPassword(password, salt, options = {}) {
+  const usages = options.usages || ['encrypt', 'decrypt'];
+  const extractable = options.extractable ?? true;
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey(
     'raw',
@@ -31,8 +33,8 @@ export async function deriveKeyFromPassword(password, salt) {
     },
     baseKey,
     { name: 'AES-GCM', length: 256 },
-    true, // extractable so we can wrap/unwrap it
-    ['encrypt', 'decrypt']
+    extractable, // extractable so we can wrap/unwrap it
+    usages
   );
 }
 
@@ -153,7 +155,10 @@ export function generateRecoveryKey() {
  */
 export async function deriveKeyFromRecoveryWords(words, salt) {
   const phrase = words.join('-');
-  return deriveKeyFromPassword(phrase, salt);
+  return deriveKeyFromPassword(phrase, salt, {
+    usages: ['wrapKey', 'unwrapKey'],
+    extractable: true,
+  });
 }
 
 // ─── Salt Generation ──────────────────────────────────────────────────────────

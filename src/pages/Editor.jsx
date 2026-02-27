@@ -1,25 +1,4 @@
 import { useState, useEffect, useRef, useCallback, Component } from 'react';
-
-// Error Boundary — catches render crashes so users see an error instead of a black screen
-class EditorErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(err) { return { error: err }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{ minHeight: '100dvh', background: '#0d0d0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#7070a0', fontFamily: 'monospace', padding: 24 }}>
-          <div style={{ fontSize: 32 }}>⚠️</div>
-          <h2 style={{ color: '#e8e8f0' }}>Something went wrong</h2>
-          <p style={{ maxWidth: 400, textAlign: 'center' }}>{this.state.error?.message || 'An unexpected error occurred in the editor.'}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: '8px 20px', background: '#e8ff47', color: '#0d0d0f', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>
-            Reload
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSession } from '../hooks/useGuestSession';
@@ -71,6 +50,27 @@ function useRelativeTime(date) {
   return label;
 }
 
+// Error Boundary — catches render crashes so users see an error instead of a black screen
+class EditorErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: '100dvh', background: '#0d0d0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#7070a0', fontFamily: 'monospace', padding: 24 }}>
+          <div style={{ fontSize: 32 }}>⚠️</div>
+          <h2 style={{ color: '#e8e8f0' }}>Something went wrong</h2>
+          <p style={{ maxWidth: 400, textAlign: 'center' }}>{this.state.error?.message || 'An unexpected error occurred.'}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: '8px 20px', background: '#e8ff47', color: '#0d0d0f', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function Editor() {
   return <EditorErrorBoundary><EditorInner /></EditorErrorBoundary>;
 }
@@ -83,7 +83,7 @@ function EditorInner() {
   const { encrypt, decrypt, isEncryptionActive } = useEncryption();
   const token = localStorage.getItem('nf_token');
 
-  // Core doc state
+  // ── State ──────────────────────────────────────────────────────────────────
   const [doc, setDoc] = useState(null);
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('Untitled');
@@ -94,16 +94,9 @@ function EditorInner() {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [docPassword, setDocPassword] = useState('');
   const [pwInput, setPwInput] = useState('');
-
-  // Collaboration
   const [collaborators, setCollaborators] = useState([]);
-
-  // Save state
   const [lastSaved, setLastSaved] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved');
-  const savedLabel = useRelativeTime(lastSaved);
-
-  // UI state
   const [toasts, setToasts] = useState([]);
   const [showVersions, setShowVersions] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -112,21 +105,127 @@ function EditorInner() {
   const [charCount, setCharCount] = useState(0);
   const [lineCount, setLineCount] = useState(1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // New features
-  const [previewMode, setPreviewMode] = useState('edit'); // 'edit' | 'split' | 'preview'
+  const [previewMode, setPreviewMode] = useState('edit');
   const [showAI, setShowAI] = useState(false);
-
-  // Tabs
   const [tabs, setTabs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TABS_KEY) || '[]'); }
     catch { return []; }
   });
 
+  const savedLabel = useRelativeTime(lastSaved);
+
+  // ── Refs ───────────────────────────────────────────────────────────────────
+  // Using refs for functions called inside effects avoids TDZ and stale closure issues.
+  // The ref is updated every render so it always holds the latest function.
   const autoSaveTimer = useRef(null);
   const isRemoteChange = useRef(false);
   const mobileMenuRef = useRef(null);
-  const editorRef = useRef(null);
+  const doSaveRef = useRef(null);         // kept in sync below
+  const contentRef = useRef(content);
+  const titleRef = useRef(title);
+  const languageRef = useRef(language);
+  const shortIdRef = useRef(shortId);
+  const docRef = useRef(doc);
+  const userRef = useRef(user);
+
+  // Keep all refs in sync with their state counterparts every render
+  contentRef.current = content;
+  titleRef.current = title;
+  languageRef.current = language;
+  shortIdRef.current = shortId;
+  docRef.current = doc;
+  userRef.current = user;
+
+  // ── Socket ─────────────────────────────────────────────────────────────────
+  const { connected, emitChange, emitSave } = useSocket({
+    shortId: shortId || doc?.short_id,
+    token, password: docPassword,
+    onDocChange: async (state) => {
+      if (state.content !== undefined) {
+        const plain = await decrypt(state.content);
+        if (plain !== contentRef.current) { isRemoteChange.current = true; setContent(plain); }
+      }
+      if (state.language) setLanguage(state.language);
+      if (state.title) setTitle(state.title);
+    },
+    onCollaboratorsUpdate: setCollaborators,
+    onSaveSuccess: (data) => {
+      setSaveStatus('saved');
+      setLastSaved(new Date(data.timestamp));
+    },
+  });
+
+  // Keep emitSave in a ref too
+  const emitSaveRef = useRef(emitSave);
+  emitSaveRef.current = emitSave;
+
+  // ── Callbacks ──────────────────────────────────────────────────────────────
+  // ALL useCallback/function declarations before any useEffect that uses them.
+
+  const addToast = useCallback((msg, type = 'success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  }, []);
+
+  // addToast ref so doSave can call it without being in dep array
+  const addToastRef = useRef(addToast);
+  addToastRef.current = addToast;
+
+  const doSave = useCallback(async (saveVersion = false) => {
+    const sid = shortIdRef.current || docRef.current?.short_id;
+    const currentContent = contentRef.current;
+    const currentTitle = titleRef.current;
+    const currentLanguage = languageRef.current;
+
+    if (!sid) {
+      // No doc yet (/editor blank route) — create one
+      setSaveStatus('saving');
+      try {
+        const encryptedContent = await encrypt(currentContent);
+        const res = await api.post('/docs', { title: currentTitle, content: encryptedContent, language: currentLanguage });
+        const newDoc = res.data.document;
+        setDoc(newDoc);
+        navigate(`/s/${newDoc.short_id}`, { replace: true });
+        setSaveStatus('saved');
+        setLastSaved(new Date());
+        if (saveVersion) addToastRef.current('✅ Version saved!', 'success');
+      } catch {
+        setSaveStatus('unsaved');
+        addToastRef.current('❌ Save failed', 'error');
+      }
+      return;
+    }
+
+    setSaveStatus('saving');
+    try {
+      const encryptedContent = await encrypt(currentContent);
+      if (userRef.current) {
+        emitSaveRef.current(saveVersion);
+        await api.put(`/docs/${sid}`, { content: encryptedContent, title: currentTitle, language: currentLanguage, saveVersion });
+      } else {
+        await api.put(`/docs/${sid}`, { content: encryptedContent, title: currentTitle, language: currentLanguage });
+      }
+      setSaveStatus('saved');
+      setLastSaved(new Date());
+      if (saveVersion) addToastRef.current('✅ Version saved!', 'success');
+    } catch {
+      setSaveStatus('unsaved');
+      addToastRef.current('❌ Save failed', 'error');
+    }
+  }, [encrypt, navigate]);
+
+  // Keep doSave in a ref so scheduleAutoSave and keyboard handler always call the latest version
+  doSaveRef.current = doSave;
+
+  const scheduleAutoSave = useCallback(() => {
+    setSaveStatus('unsaved');
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => doSaveRef.current(false), 2000);
+  }, []);
+
+  // ── Effects ────────────────────────────────────────────────────────────────
+  // All effects are after all callbacks/refs, so nothing is in TDZ.
 
   // Persist tabs
   useEffect(() => {
@@ -162,182 +261,120 @@ function EditorInner() {
     };
     document.addEventListener('mousedown', handler);
     document.addEventListener('touchstart', handler);
-    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — uses doSaveRef so no dependency on doSave, no TDZ
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        if (e.shiftKey) doSave(true);
-        else doSave(false);
+        doSaveRef.current(e.shiftKey ? true : false);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [doSave]);
+  }, []); // intentionally empty — doSaveRef is always current
 
-  const { connected, emitChange, emitSave } = useSocket({
-    shortId: shortId || doc?.short_id,
-    token, password: docPassword,
-    onDocChange: async (state) => {
-      if (state.content !== undefined) {
-        const plain = await decrypt(state.content);
-        if (plain !== content) { isRemoteChange.current = true; setContent(plain); }
-      }
-      if (state.language) setLanguage(state.language);
-      if (state.title) setTitle(state.title);
-    },
-    onCollaboratorsUpdate: setCollaborators,
-    onSaveSuccess: (data) => {
-      setSaveStatus('saved');
-      setLastSaved(new Date(data.timestamp));
-    },
-  });
-
+  // Load doc
   useEffect(() => {
     if (!shortId) { setLoading(false); return; }
-    loadDoc();
-  }, [shortId, docPassword]);
-
-  const loadDoc = async () => {
-    try {
-      const params = docPassword ? `?password=${encodeURIComponent(docPassword)}` : '';
-      const res = await api.get(`/docs/${shortId}${params}`);
-      const d = res.data.document;
-      setDoc(d);
-      const plain = await decrypt(d.content);
-      setContent(plain);
-      setCharCount(plain.length);
-      setLineCount(plain.split('\n').length);
-      setTitle(d.title);
-      setLanguage(d.language);
-      setPasswordRequired(false);
-    } catch (err) {
-      if (err.response?.status === 423 || err.response?.data?.passwordRequired) {
-        setPasswordRequired(true);
-      } else if (err.response?.status === 403) {
-        navigate('/');
-      } else if (err.response?.status === 404) {
-        setLoadDocError('Document not found.');
-      } else {
-        setLoadDocError(err.response?.data?.error || err.message || 'Failed to load document.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // addToast must be defined BEFORE doSave (doSave's dep array references it)
-  const addToast = useCallback((msg, type = 'success') => {
-    const id = Date.now();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  }, []);
-
-  const doSaveRef = useRef(null);
-
-  const scheduleAutoSave = useCallback(() => {
-    setSaveStatus('unsaved');
-    clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => doSaveRef.current?.(false), 2000);
-  }, []);
-
-  const doSave = useCallback(async (saveVersion = false) => {
-    const sid = shortId || doc?.short_id;
-
-    // If no document exists yet (blank /editor route), create one first
-    if (!sid) {
-      setSaveStatus('saving');
+    let cancelled = false;
+    const load = async () => {
       try {
-        const encryptedContent = await encrypt(content);
-        const res = await api.post('/docs', { title, content: encryptedContent, language });
-        const newDoc = res.data.document;
-        setDoc(newDoc);
-        navigate(`/s/${newDoc.short_id}`, { replace: true });
-        setSaveStatus('saved');
-        setLastSaved(new Date());
-        if (saveVersion) addToast('✅ Version saved!', 'success');
-      } catch {
-        setSaveStatus('unsaved');
-        addToast('❌ Save failed', 'error');
+        const params = docPassword ? `?password=${encodeURIComponent(docPassword)}` : '';
+        const res = await api.get(`/docs/${shortId}${params}`);
+        if (cancelled) return;
+        const d = res.data.document;
+        setDoc(d);
+        const plain = await decrypt(d.content);
+        if (cancelled) return;
+        setContent(plain);
+        setCharCount(plain.length);
+        setLineCount(plain.split('\n').length);
+        setTitle(d.title);
+        setLanguage(d.language);
+        setPasswordRequired(false);
+        setLoadDocError('');
+      } catch (err) {
+        if (cancelled) return;
+        if (err.response?.status === 423 || err.response?.data?.passwordRequired) {
+          setPasswordRequired(true);
+        } else if (err.response?.status === 403) {
+          navigate('/');
+        } else if (err.response?.status === 404) {
+          setLoadDocError('Document not found.');
+        } else {
+          setLoadDocError(err.response?.data?.error || err.message || 'Failed to load document.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      return;
-    }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [shortId, docPassword, decrypt, navigate]);
 
-    setSaveStatus('saving');
-    try {
-      const encryptedContent = await encrypt(content);
-      if (user) {
-        emitSave(saveVersion);
-        await api.put(`/docs/${sid}`, { content: encryptedContent, title, language, saveVersion });
-      } else {
-        await api.put(`/docs/${sid}`, { content: encryptedContent, title, language });
-      }
-      setSaveStatus('saved');
-      setLastSaved(new Date());
-      if (saveVersion) addToast('✅ Version saved!', 'success');
-    } catch {
-      setSaveStatus('unsaved');
-      addToast('❌ Save failed', 'error');
-    }
-  }, [shortId, doc, content, title, language, encrypt, user, emitSave, navigate, addToast]);
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  // Keep the ref in sync so scheduleAutoSave always calls the latest doSave
-  doSaveRef.current = doSave;
-
-  const handleContentChange = (val) => {
+  const handleContentChange = useCallback((val) => {
     if (isRemoteChange.current) { isRemoteChange.current = false; return; }
     setContent(val);
     setCharCount(val.length);
     setLineCount(val.split('\n').length);
-    emitChange({ content: val, language, title });
+    emitChange({ content: val, language: languageRef.current, title: titleRef.current });
     scheduleAutoSave();
-  };
+  }, [emitChange, scheduleAutoSave]);
 
-  const handleLangChange = (lang) => {
+  const handleLangChange = useCallback((lang) => {
     setLanguage(lang);
-    emitChange({ content, language: lang, title });
+    emitChange({ content: contentRef.current, language: lang, title: titleRef.current });
     scheduleAutoSave();
-  };
+  }, [emitChange, scheduleAutoSave]);
 
-  const handleTitleChange = (t) => {
+  const handleTitleChange = useCallback((t) => {
     setTitle(t);
-    emitChange({ content, language, title: t });
+    emitChange({ content: contentRef.current, language: languageRef.current, title: t });
     scheduleAutoSave();
-  };
+  }, [emitChange, scheduleAutoSave]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const extMap = { javascript:'js', typescript:'ts', python:'py', html:'html', css:'css', json:'json', markdown:'md', sql:'sql', bash:'sh', java:'java', cpp:'cpp', rust:'rs', php:'php' };
-    const ext = extMap[language] || 'txt';
-    const blob = new Blob([content], { type: 'text/plain' });
+    const ext = extMap[languageRef.current] || 'txt';
+    const blob = new Blob([contentRef.current], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (title || 'untitled') + '.' + ext;
+    a.download = (titleRef.current || 'untitled') + '.' + ext;
     a.click();
     URL.revokeObjectURL(a.href);
-    addToast('💾 Downloaded!', 'success');
+    addToastRef.current('💾 Downloaded!', 'success');
     setMobileMenuOpen(false);
-  };
+  }, []);
 
-  const closeTab = (tabShortId, e) => {
+  const closeTab = useCallback((tabShortId, e) => {
     e.stopPropagation();
-    const tab = tabs.find(t => t.shortId === tabShortId);
-    if (tab?.unsaved && !window.confirm('This tab has unsaved changes. Close anyway?')) return;
-    const remaining = tabs.filter(t => t.shortId !== tabShortId);
-    setTabs(remaining);
-    if (tabShortId === shortId) {
-      if (remaining.length > 0) navigate(`/s/${remaining[remaining.length - 1].shortId}`);
-      else navigate(user ? '/dashboard' : '/');
-    }
-  };
+    setTabs(prev => {
+      const tab = prev.find(t => t.shortId === tabShortId);
+      if (tab?.unsaved && !window.confirm('This tab has unsaved changes. Close anyway?')) return prev;
+      const remaining = prev.filter(t => t.shortId !== tabShortId);
+      if (tabShortId === shortIdRef.current) {
+        if (remaining.length > 0) navigate(`/s/${remaining[remaining.length - 1].shortId}`);
+        else navigate(userRef.current ? '/dashboard' : '/');
+      }
+      return remaining;
+    });
+  }, [navigate]);
 
-  const cyclePreview = () => {
-    if (language !== 'markdown') return;
+  const cyclePreview = useCallback(() => {
+    if (languageRef.current !== 'markdown') return;
     const modes = ['edit', 'split', 'preview'];
     setPreviewMode(m => modes[(modes.indexOf(m) + 1) % modes.length]);
-  };
+  }, []);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   const statusText = { saved: savedLabel ? `Saved ${savedLabel}` : 'Saved', saving: 'Saving…', unsaved: 'Unsaved changes' };
 
@@ -492,7 +529,6 @@ function EditorInner() {
 
       {/* ── MAIN AREA ── */}
       <div className={styles.mainArea}>
-        {/* Editor + Preview */}
         <div className={`${styles.editorArea} ${showAI ? styles.editorWithSidebar : ''}`}>
           {previewMode !== 'preview' && (
             <div className={`${styles.editorPane} ${previewMode === 'split' ? styles.splitPane : ''}`}>
@@ -512,7 +548,6 @@ function EditorInner() {
           )}
         </div>
 
-        {/* AI Sidebar */}
         {showAI && (
           <AIChatSidebar
             docContent={content}
@@ -544,7 +579,7 @@ function EditorInner() {
         <span className={styles.hideOnMobile}>Ctrl+S to save</span>
       </footer>
 
-      {/* Modals */}
+      {/* ── MODALS ── */}
       {showVersions && (
         <VersionsModal shortId={shortId || doc?.short_id}
           onRestore={async (v) => {

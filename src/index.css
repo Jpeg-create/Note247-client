@@ -22,13 +22,25 @@
 }
 
 .light {
-  --bg: #f5f5f0;
-  --bg2: #ebebE5;
-  --bg3: #dfdfd8;
-  --border: #c8c8c0;
-  --text: #1a1a2e;
-  --text-dim: #5050a0;
-  --text-muted: #a0a090;
+  /* Backgrounds — warm off-white progression */
+  --bg:   #f7f7f2;
+  --bg2:  #ededea;
+  --bg3:  #e2e2dc;
+  --border: #ccccc4;
+
+  /* Text — near-black to mid-gray */
+  --text:      #111118;
+  --text-dim:  #52526e;
+  --text-muted:#9898a8;
+
+  /* Accents remapped for light backgrounds:
+     --accent  (primary action): rich indigo   5.6:1 contrast on --bg
+     --accent2 (success/live):   dark teal     4.7:1 contrast on --bg
+     --accent3 (danger/alerts):  deep rose     5.1:1 contrast on --bg   */
+  --accent:  #4f46e5;
+  --accent2: #0e7490;   /* cyan-700   — 5.0:1 on --bg */
+  --accent3: #be123c;   /* rose-700   — 5.9:1 on --bg */
+  --shadow:  0 4px 24px rgba(0, 0, 0, 0.10);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,6 +78,7 @@ body {
 }
 .btn:hover { background: var(--bg3); color: var(--text); border-color: var(--text-muted); }
 .btn.accent { background: var(--accent); color: #0d0d0f; border-color: var(--accent); }
+.light .btn.accent { color: #ffffff; }   /* indigo bg needs white text, not near-black */
 .btn.accent:hover { opacity: 0.85; }
 .btn.danger { background: var(--accent3); color: #fff; border-color: var(--accent3); }
 .btn.ghost { border-color: transparent; }
@@ -160,7 +173,9 @@ body {
   font-family: var(--font-mono);
 }
 .badge.green { background: rgba(71,255,184,0.15); color: var(--accent2); }
+.light .badge.green { background: rgba(8,145,178,0.12); }
 .badge.yellow { background: rgba(232,255,71,0.15); color: var(--accent); }
+.light .badge.yellow { background: rgba(79,70,229,0.12); }
 .badge.red { background: rgba(255,107,157,0.15); color: var(--accent3); }
 
 @media (max-width: 640px) {

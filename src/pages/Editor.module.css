@@ -366,3 +366,113 @@
 .editorPane > :global(.richEditor) {
   height: 100%;
 }
+
+/* ── LIGHT MODE OVERRIDES ─────────────────────────────────────────────────────
+   All accent-as-text rules need remapping. The --accent, --accent2, --accent3
+   variables are already swapped in .light via index.css, so most rules just
+   work. These overrides handle cases where colours are hardcoded or where
+   extra contrast/aesthetic tweaks are needed.                                */
+
+.editorPage.light,
+.light {
+  /* Toolbar surface slightly separated from page */
+}
+
+/* Toolbar bg in light mode — slightly more elevated than the page */
+.light .toolbar {
+  background: var(--bg2);
+  border-bottom-color: var(--border);
+}
+
+/* Tab bar */
+.light .tabBar {
+  background: var(--bg);
+  border-bottom-color: var(--border);
+}
+
+/* Active tab accent stripe is now indigo — already handled by --accent var */
+
+/* Logo — indigo instead of yellow */
+.light .logoSmall {
+  color: var(--accent);
+}
+
+/* Active toolbar button (e.g. ✍️ Rich Text active, AI active) */
+.light .activeBtn {
+  background: rgba(79, 70, 229, 0.10) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* Connection dot — teal in light mode */
+.light .connGreen {
+  background: var(--accent2);
+  box-shadow: 0 0 5px rgba(14, 116, 144, 0.4);
+}
+
+/* Save status colours */
+.light .saved   { color: var(--accent2); }
+.light .saving  { color: var(--accent); }
+.light .unsaved { color: var(--accent3); }
+
+/* Collaborator avatar ring */
+.light .avatar {
+  border-color: var(--bg2);
+}
+
+/* Mobile menu */
+.light .mobileMenu {
+  background: var(--bg2);
+  border-color: var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.light .mobileMenuItem {
+  color: var(--text);
+}
+
+.light .mobileMenuItem:hover {
+  background: var(--bg3);
+}
+
+.light .mobileMenuAccent {
+  color: var(--accent);
+}
+
+/* Status bar */
+.light .statusBar {
+  background: var(--bg2);
+  border-top-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* Language select */
+.light .langSelect {
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Title input */
+.light .titleInput {
+  color: var(--text);
+}
+
+.light .titleInput:focus {
+  border-color: var(--accent);
+}
+
+/* E2EE badge */
+.light .encryptBadge {
+  color: var(--accent2);
+}
+
+/* Lock screen */
+.light .lockScreen {
+  background: var(--bg);
+}
+
+.light .lockCard {
+  background: var(--bg2);
+  border-color: var(--border);
+}

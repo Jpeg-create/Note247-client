@@ -185,3 +185,59 @@
     z-index: 100;
   }
 }
+
+/* ── LIGHT MODE ── */
+.light .sidebar {
+  background: var(--bg2);
+  border-left-color: var(--border);
+}
+
+.light .header {
+  background: var(--bg2);
+  border-bottom-color: var(--border);
+}
+
+.light .tab {
+  color: var(--text-dim);
+}
+
+.light .tabActive {
+  background: var(--bg3);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.light .aiMessage .msgBubble {
+  background: var(--bg3);
+  color: var(--text);
+}
+
+.light .userMessage .msgBubble {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.light .input {
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.light .input:focus {
+  border-color: var(--accent);
+}
+
+.light .rewriteInput {
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.light .rewriteResult {
+  background: var(--bg3);
+  border-color: var(--border);
+}
+
+.light .rewriteCode {
+  color: var(--text);
+}

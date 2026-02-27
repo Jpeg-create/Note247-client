@@ -6,9 +6,11 @@ import { useSocket } from '../hooks/useSocket';
 import { useEncryption } from '../hooks/useEncryption';
 import api from '../utils/api';
 import CodeMirrorEditor from '../components/CodeMirrorEditor';
+import RichTextEditor from '../components/RichTextEditor';
 import VersionsModal from '../components/VersionsModal';
 import { ShareModal, PasswordModal } from '../components/ShareModal';
 import GuestLimitBanner from '../components/GuestLimitBanner';
+import TemplateModal from '../components/TemplateModal';
 import AIChatSidebar from '../components/AIChatSidebar';
 import MarkdownPreview from '../components/MarkdownPreview';
 import styles from './Editor.module.css';
@@ -28,6 +30,7 @@ const LANGS = [
   { value: 'cpp', label: 'C++' },
   { value: 'rust', label: 'Rust' },
   { value: 'php', label: 'PHP' },
+  { value: 'richtext', label: 'Rich Text' },
 ];
 
 const TABS_KEY = 'n247_tabs';
@@ -107,6 +110,9 @@ function EditorInner() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState('edit');
   const [showAI, setShowAI] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  const [prevCodeLang, setPrevCodeLang] = useState('plaintext'); // for toggling back from richtext
   const [tabs, setTabs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TABS_KEY) || '[]'); }
     catch { return []; }
@@ -285,8 +291,8 @@ function EditorInner() {
     let cancelled = false;
     const load = async () => {
       try {
-        const params = docPassword ? `?password=${encodeURIComponent(docPassword)}` : '';
-        const res = await api.get(`/docs/${shortId}${params}`);
+        const headers = docPassword ? { 'x-doc-password': docPassword } : {};
+        const res = await api.get(`/docs/${shortId}`, { headers });
         if (cancelled) return;
         const d = res.data.document;
         setDoc(d);
@@ -353,6 +359,82 @@ function EditorInner() {
     addToastRef.current('💾 Downloaded!', 'success');
     setMobileMenuOpen(false);
   }, []);
+
+  const handleExportPDF = useCallback(() => {
+    const title = titleRef.current || 'document';
+    const lang = languageRef.current;
+    const isRich = lang === 'richtext';
+
+    // Build printable HTML
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { font-family: Georgia, serif; font-size: 13pt; line-height: 1.75; color: #111;
+         max-width: 720px; margin: 40px auto; padding: 0 32px; }
+  h1,h2,h3 { font-family: system-ui, sans-serif; }
+  h1 { font-size: 24pt; margin-bottom: 8px; } h2 { font-size: 18pt; } h3 { font-size: 14pt; }
+  pre, code { background: #f4f4f6; border-radius: 4px; font-size: 10pt; }
+  pre { padding: 14px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 11pt; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+  th { background: #f4f4f6; font-weight: 700; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
+  ul, ol { padding-left: 1.6em; }
+  input[type=checkbox] { margin-right: 6px; }
+  @media print { body { margin: 20px; } }
+</style>
+</head><body>
+<h1>${title}</h1>
+${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`}
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (win) {
+      win.onload = () => {
+        win.focus();
+        win.print();
+        setTimeout(() => { win.close(); URL.revokeObjectURL(url); }, 1000);
+      };
+    } else {
+      // Fallback: download as HTML
+      const a = document.createElement('a');
+      a.href = url; a.download = title + '.html'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    addToastRef.current('📄 PDF export opened', 'success');
+    setMobileMenuOpen(false);
+  }, []);
+
+  const prevCodeLangRef = useRef(prevCodeLang);
+  prevCodeLangRef.current = prevCodeLang;
+
+  const toggleEditorMode = useCallback(() => {
+    const current = languageRef.current;
+    if (current === 'richtext') {
+      handleLangChange(prevCodeLangRef.current || 'plaintext');
+    } else {
+      setPrevCodeLang(current);
+      handleLangChange('richtext');
+    }
+  }, [handleLangChange]);
+
+  const handleNewTabWithTemplate = useCallback(() => {
+    setShowTemplates(true);
+  }, []);
+
+  const handleSelectTemplate = useCallback(async (template) => {
+    setShowTemplates(false);
+    const language = template.mode === 'code' ? (template.language || 'javascript') : 'richtext';
+    try {
+      const encContent = await encrypt(template.content || '');
+      const res = await api.post('/docs', { title: template.docTitle || 'Untitled', content: encContent, language });
+      const newDoc = res.data.document;
+      navigate(`/s/${newDoc.short_id}`);
+    } catch {
+      addToastRef.current('❌ Could not create document', 'error');
+    }
+  }, [encrypt, navigate]);
 
   const closeTab = useCallback((tabShortId, e) => {
     e.stopPropagation();
@@ -432,7 +514,7 @@ function EditorInner() {
               </div>
             ))}
           </div>
-          <button className={styles.tabNew} onClick={() => navigate('/editor')} title="New tab">＋</button>
+          <button className={styles.tabNew} onClick={handleNewTabWithTemplate} title="New tab">＋</button>
         </div>
       )}
 
@@ -454,13 +536,25 @@ function EditorInner() {
 
         {/* Desktop actions */}
         <div className={styles.desktopActions}>
-          <select className={styles.langSelect} value={language} onChange={e => handleLangChange(e.target.value)}>
-            {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-          </select>
-          <div className={styles.sep} />
+          {language !== 'richtext' && (
+            <>
+              <select className={styles.langSelect} value={language} onChange={e => handleLangChange(e.target.value)}>
+                {LANGS.filter(l => l.value !== 'richtext').map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+              <div className={styles.sep} />
+            </>
+          )}
           <button className="btn sm ghost" onClick={() => doSave(false)} title="Ctrl+S">💾 Save</button>
           <button className="btn sm ghost" onClick={() => doSave(true)} title="Ctrl+Shift+S">+ Version</button>
           <button className="btn sm ghost" onClick={handleExport}>↓ Export</button>
+          <button className="btn sm ghost" onClick={handleExportPDF}>📄 PDF</button>
+          <button
+            className={`btn sm ghost ${language === 'richtext' ? styles.activeBtn : ''}`}
+            onClick={toggleEditorMode}
+            title={language === 'richtext' ? 'Switch to Code Editor' : 'Switch to Rich Text'}
+          >
+            {language === 'richtext' ? '</> Code' : '✍️ Rich Text'}
+          </button>
           {language === 'markdown' && (
             <button className={`btn sm ghost ${previewMode !== 'edit' ? styles.activeBtn : ''}`} onClick={cyclePreview}>
               {previewMode === 'edit' ? '👁 Preview' : previewMode === 'split' ? '✏️ Edit' : '⚡ Split'}
@@ -514,6 +608,10 @@ function EditorInner() {
                 <button className={styles.mobileMenuItem} onClick={() => { setShowShare(true); setMobileMenuOpen(false); }}>🔗 Share Link</button>
                 <button className={styles.mobileMenuItem} onClick={() => { setShowPasswordModal(true); setMobileMenuOpen(false); }}>🔒 Set Password</button>
                 <button className={styles.mobileMenuItem} onClick={handleExport}>↓ Export File</button>
+                <button className={styles.mobileMenuItem} onClick={handleExportPDF}>📄 Export as PDF</button>
+                <button className={styles.mobileMenuItem} onClick={() => { toggleEditorMode(); setMobileMenuOpen(false); }}>
+                  {language === 'richtext' ? '</> Switch to Code Editor' : '✍️ Switch to Rich Text'}
+                </button>
                 <div className={styles.mobileMenuDivider} />
                 <button className={styles.mobileMenuItem} onClick={() => { setIsDark(d => !d); setMobileMenuOpen(false); }}>
                   {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
@@ -532,13 +630,22 @@ function EditorInner() {
         <div className={`${styles.editorArea} ${showAI ? styles.editorWithSidebar : ''}`}>
           {previewMode !== 'preview' && (
             <div className={`${styles.editorPane} ${previewMode === 'split' ? styles.splitPane : ''}`}>
-              <CodeMirrorEditor
-                value={content}
-                language={language}
-                isDark={isDark}
-                onChange={handleContentChange}
-                onCursorChange={({ line, col }) => setCursor({ line, col })}
-              />
+              {language === 'richtext' ? (
+                <RichTextEditor
+                  value={content}
+                  isDark={isDark}
+                  onChange={handleContentChange}
+                  onWordCount={setWordCount}
+                />
+              ) : (
+                <CodeMirrorEditor
+                  value={content}
+                  language={language}
+                  isDark={isDark}
+                  onChange={handleContentChange}
+                  onCursorChange={({ line, col }) => setCursor({ line, col })}
+                />
+              )}
             </div>
           )}
           {language === 'markdown' && previewMode !== 'edit' && (
@@ -570,7 +677,11 @@ function EditorInner() {
         <span className={styles.sep2} />
         <span className={styles.hideOnMobile}>Ln {cursor.line}, Col {cursor.col}</span>
         <span className={`${styles.sep2} ${styles.hideOnMobile}`} />
-        <span className={styles.hideOnMobile}>{charCount.toLocaleString()} chars · {lineCount} lines</span>
+        <span className={styles.hideOnMobile}>
+          {language === 'richtext'
+            ? `${wordCount.toLocaleString()} words`
+            : `${charCount.toLocaleString()} chars · ${lineCount} lines`}
+        </span>
         <div className="spacer" />
         {isEncryptionActive && <span className={styles.encryptBadge}>🔐 E2EE</span>}
         <span className={styles.sep2} />
@@ -602,6 +713,10 @@ function EditorInner() {
       <div className="toast-container">
         {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}
       </div>
+
+      {showTemplates && (
+        <TemplateModal onSelect={handleSelectTemplate} onClose={() => setShowTemplates(false)} />
+      )}
     </div>
   );
 }

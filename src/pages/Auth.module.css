@@ -29,6 +29,7 @@
   margin-bottom: 28px;
   letter-spacing: -0.5px;
 }
+
 .logo span { color: var(--text); }
 
 .title {
@@ -50,11 +51,13 @@
   margin-top: 20px;
   text-align: center;
 }
+
 .switchLink a {
   color: var(--accent);
   text-decoration: none;
   font-weight: 600;
 }
+
 .switchLink a:hover { text-decoration: underline; }
 
 .limitBanner {

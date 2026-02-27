@@ -3,16 +3,19 @@ import api from '../utils/api';
 import styles from './AIChatSidebar.module.css';
 
 const ACTIONS = [
-  { key: 'improve', label: '✨ Improve' },
-  { key: 'fix', label: '🐛 Fix bugs' },
-  { key: 'explain', label: '💡 Explain' },
-  { key: 'comment', label: '📝 Add comments' },
-  { key: 'shorter', label: '✂️ Make shorter' },
+  { key: 'improve',     label: '✨ Improve writing' },
+  { key: 'professional',label: '👔 Make professional' },
+  { key: 'summarize',   label: '📋 Summarize' },
+  { key: 'shorter',     label: '✂️ Make shorter' },
+  { key: 'draft',       label: '🖊️ Generate draft' },
+  { key: 'translate',   label: '🌐 Translate' },
+  { key: 'fix',         label: '🐛 Fix bugs' },
+  { key: 'explain',     label: '💡 Explain' },
 ];
 
 export default function AIChatSidebar({ docContent, language, isDark, onClose, onInsert }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Hi! I'm your AI assistant. I can see your ${language} document. Ask me anything — explain code, fix bugs, rewrite sections, or just chat.` }
+    { role: 'assistant', content: `Hi! I'm your AI writing assistant. I can help you improve your writing, summarize notes, translate content, generate drafts, or answer questions about your document. What would you like to do?` }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

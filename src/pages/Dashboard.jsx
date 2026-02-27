@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { getApiErrorMessage } from '../utils/api';
+import TemplateModal from '../components/TemplateModal';
 import styles from './Dashboard.module.css';
 
 const FOLDER_COLORS = ['#e8ff47','#47ffb8','#ff6b9d','#69b3ff','#ff9f47','#c084fc'];
@@ -40,6 +41,12 @@ export default function Dashboard() {
   // Move doc dropdown
   const [moveDoc, setMoveDoc] = useState(null); // shortId of doc being moved
 
+  // Templates
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     fetchAll();
@@ -61,11 +68,14 @@ export default function Dashboard() {
     }
   };
 
-  const newDoc = async () => {
+  const newDoc = () => setShowTemplates(true);
+
+  const createDocFromTemplate = async (template) => {
+    setShowTemplates(false);
     setError('');
     try {
-      const body = { title: 'Untitled', content: '', language: 'plaintext' };
-      // Only send folder_id if it's an actual UUID (not 'unfiled' or null sentinel)
+      const language = template.mode === 'code' ? (template.language || 'javascript') : 'richtext';
+      const body = { title: template.docTitle || 'Untitled', content: template.content || '', language };
       if (activeFolder && activeFolder !== 'unfiled') body.folder_id = activeFolder;
       const res = await api.post('/docs', body);
       navigate(`/s/${res.data.document.short_id}`);
@@ -127,11 +137,14 @@ export default function Dashboard() {
   };
 
   // Filtered docs
-  const visibleDocs = activeFolder === null
+  const folderDocs = activeFolder === null
     ? docs
     : activeFolder === 'unfiled'
     ? docs.filter(d => !d.folder_id)
     : docs.filter(d => d.folder_id === activeFolder);
+  const visibleDocs = searchQuery.trim()
+    ? docs.filter(d => d.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : folderDocs;
 
   const unfiledCount = docs.filter(d => !d.folder_id).length;
 
@@ -192,9 +205,23 @@ export default function Dashboard() {
         <main className={styles.main}>
           <div className={styles.pageHeader}>
             <h1>
-              {activeFolder === null ? 'All Documents' : activeFolder === 'unfiled' ? 'Unfiled' : folders.find(f => f.id === activeFolder)?.name || 'Documents'}
+              {searchQuery.trim() ? `Search: "${searchQuery}"` : activeFolder === null ? 'All Documents' : activeFolder === 'unfiled' ? 'Unfiled' : folders.find(f => f.id === activeFolder)?.name || 'Documents'}
             </h1>
-            <button className="btn accent" onClick={newDoc}>+ New Document</button>
+            <div className={styles.pageHeaderRight}>
+              <div className={styles.searchWrap}>
+                <input
+                  className={styles.searchInput}
+                  type="search"
+                  placeholder="Search documents…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button className={styles.searchClear} onClick={() => setSearchQuery('')}>×</button>
+                )}
+              </div>
+              <button className="btn accent" onClick={newDoc}>+ New Document</button>
+            </div>
           </div>
 
           {error && <div className="form-error" style={{ marginBottom: 16 }} role="alert">{error}</div>}
@@ -285,6 +312,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+      {showTemplates && (
+        <TemplateModal onSelect={createDocFromTemplate} onClose={() => setShowTemplates(false)} />
       )}
     </div>
   );

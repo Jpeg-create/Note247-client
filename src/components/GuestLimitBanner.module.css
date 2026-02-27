@@ -8,11 +8,13 @@
   gap: 12px;
   flex-shrink: 0;
 }
+
 .warning {
   background: rgba(232,255,71,0.08);
   border-bottom: 1px solid rgba(232,255,71,0.2);
   color: var(--accent);
 }
+
 .locked {
   background: rgba(255,107,157,0.08);
   border-bottom: 1px solid rgba(255,107,157,0.2);

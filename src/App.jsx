@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Recover from './pages/Recover';
 import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 import './index.css';
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/editor" element={<Editor />} />
           <Route path="/s/:shortId" element={<Editor />} />
+          <Route path="/u/:username" element={<Profile />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

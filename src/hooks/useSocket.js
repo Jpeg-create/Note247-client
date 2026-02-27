@@ -48,7 +48,7 @@ export const useSocket = ({ shortId, token, password, onDocChange, onCollaborato
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [shortId, token]);
+  }, [shortId, token, password]);
 
   const emitChange = useCallback((data) => {
     socketRef.current?.emit('doc-change', { shortId, ...data });

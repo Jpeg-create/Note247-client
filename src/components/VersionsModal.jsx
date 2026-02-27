@@ -48,12 +48,14 @@ export default function VersionsModal({ shortId, onRestore, onClose }) {
                   <div>
                     <div className={styles.versionTitle}>{v.title}</div>
                     <div className={styles.versionMeta}>
-                      {formatDate(v.created_at)} · by {v.saved_by || 'unknown'} · {v.language}
+                      {formatDate(v.created_at)} · by {v.saved_by_name || 'unknown'} · {v.language}
                     </div>
                   </div>
                   <button
                     className="btn sm accent"
-                    onClick={(e) => { e.stopPropagation(); onRestore(preview || v); }}
+                    disabled={preview?.id !== v.id}
+                    title={preview?.id !== v.id ? 'Click to preview first' : 'Restore this version'}
+                    onClick={(e) => { e.stopPropagation(); if (preview?.id === v.id) onRestore(preview); }}
                   >
                     Restore
                   </button>

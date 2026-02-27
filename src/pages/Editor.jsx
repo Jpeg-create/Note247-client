@@ -1,4 +1,25 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Component } from 'react';
+
+// Error Boundary — catches render crashes so users see an error instead of a black screen
+class EditorErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: '100dvh', background: '#0d0d0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: '#7070a0', fontFamily: 'monospace', padding: 24 }}>
+          <div style={{ fontSize: 32 }}>⚠️</div>
+          <h2 style={{ color: '#e8e8f0' }}>Something went wrong</h2>
+          <p style={{ maxWidth: 400, textAlign: 'center' }}>{this.state.error?.message || 'An unexpected error occurred in the editor.'}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: '8px 20px', background: '#e8ff47', color: '#0d0d0f', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSession } from '../hooks/useGuestSession';
@@ -51,6 +72,10 @@ function useRelativeTime(date) {
 }
 
 export default function Editor() {
+  return <EditorErrorBoundary><EditorInner /></EditorErrorBoundary>;
+}
+
+function EditorInner() {
   const { shortId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -65,6 +90,7 @@ export default function Editor() {
   const [language, setLanguage] = useState('plaintext');
   const [isDark, setIsDark] = useState(true);
   const [loading, setLoading] = useState(!!shortId);
+  const [loadDocError, setLoadDocError] = useState('');
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [docPassword, setDocPassword] = useState('');
   const [pwInput, setPwInput] = useState('');
@@ -193,11 +219,22 @@ export default function Editor() {
         setPasswordRequired(true);
       } else if (err.response?.status === 403) {
         navigate('/');
+      } else if (err.response?.status === 404) {
+        setLoadDocError('Document not found.');
+      } else {
+        setLoadDocError(err.response?.data?.error || err.message || 'Failed to load document.');
       }
     } finally {
       setLoading(false);
     }
   };
+
+  // addToast must be defined BEFORE doSave (doSave's dep array references it)
+  const addToast = useCallback((msg, type = 'success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  }, []);
 
   const doSaveRef = useRef(null);
 
@@ -296,12 +333,6 @@ export default function Editor() {
     }
   };
 
-  const addToast = useCallback((msg, type = 'success') => {
-    const id = Date.now();
-    setToasts(t => [...t, { id, msg, type }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
-  }, []);
-
   const cyclePreview = () => {
     if (language !== 'markdown') return;
     const modes = ['edit', 'split', 'preview'];
@@ -331,6 +362,16 @@ export default function Editor() {
       <div className={styles.loading}>
         <div className={styles.loadingSpinner} />
         <span>Loading…</span>
+      </div>
+    );
+  }
+
+  if (loadDocError) {
+    return (
+      <div className={styles.loading}>
+        <div style={{ fontSize: 32 }}>⚠️</div>
+        <span style={{ color: 'var(--text)' }}>{loadDocError}</span>
+        <button className="btn accent" onClick={() => navigate('/')}>Go Home</button>
       </div>
     );
   }

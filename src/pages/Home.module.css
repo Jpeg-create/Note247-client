@@ -33,8 +33,8 @@
   background-size: 180px;
 }
 
-/* Everything above the fixed bg */
-.home > *:not(.bgRadial) { position: relative; z-index: 1; }
+/* Everything above the fixed bg — but NOT modals/overlays which use position:fixed */
+.home > *:not(.bgRadial):not([class*="overlay"]) { position: relative; z-index: 1; }
 
 /* ── NAV ─────────────────────────────────────────────────────────────────── */
 .nav {

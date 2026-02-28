@@ -148,7 +148,14 @@ export default function Dashboard() {
 
   const unfiledCount = docs.filter(d => !d.folder_id).length;
 
+  // Compute live doc counts per folder from docs array (stays in sync with moves/deletes)
+  const folderDocCounts = folders.reduce((acc, f) => {
+    acc[f.id] = docs.filter(d => d.folder_id === f.id).length;
+    return acc;
+  }, {});
+
   return (
+    <>
     <div className={styles.dashboard}>
       <header className={styles.header}>
         <div className={styles.logo} onClick={() => navigate('/')}>Note<span>247</span></div>
@@ -193,7 +200,7 @@ export default function Dashboard() {
                 >
                   <span className={styles.folderDot} style={{ background: f.color }} />
                   <span className={styles.folderName}>{f.name}</span>
-                  <span className={styles.sidebarCount}>{f.doc_count}</span>
+                  <span className={styles.sidebarCount}>{folderDocCounts[f.id] ?? 0}</span>
                 </button>
                 <button className={styles.folderDelete} onClick={() => deleteFolder(f.id)} title="Delete folder">×</button>
               </div>
@@ -284,6 +291,8 @@ export default function Dashboard() {
         </main>
       </div>
 
+    </div>
+
       {/* New folder modal */}
       {showFolderModal && (
         <div className="overlay" onClick={() => setShowFolderModal(false)}>
@@ -316,6 +325,6 @@ export default function Dashboard() {
       {showTemplates && (
         <TemplateModal onSelect={createDocFromTemplate} onClose={() => setShowTemplates(false)} />
       )}
-    </div>
+    </>
   );
 }

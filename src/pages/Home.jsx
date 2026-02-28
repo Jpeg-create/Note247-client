@@ -175,6 +175,7 @@ export default function Home() {
   };
 
   return (
+    <>
     <div className={styles.home}>
       <div className={styles.bgRadial} aria-hidden="true" />
 
@@ -266,9 +267,10 @@ export default function Home() {
         {!user && <button className="btn sm ghost" onClick={() => navigate('/signup')}>Create free account</button>}
       </footer>
 
-      {showTemplates && (
-        <TemplateModal onSelect={handleSelectTemplate} onClose={() => setShowTemplates(false)} />
-      )}
     </div>
+    {showTemplates && (
+      <TemplateModal onSelect={handleSelectTemplate} onClose={() => setShowTemplates(false)} />
+    )}
+    </>
   );
 }

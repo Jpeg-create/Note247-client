@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSession } from '../hooks/useGuestSession';
@@ -6,6 +6,83 @@ import api, { getApiErrorMessage } from '../utils/api';
 import TemplateModal from '../components/TemplateModal';
 import styles from './Home.module.css';
 
+// ── Number ticker ──────────────────────────────────────────────────────────
+function useTicker(target, suffix = '', active = false) {
+  const [display, setDisplay] = useState('0');
+  useEffect(() => {
+    if (!active) return;
+    const dur = 700, t0 = performance.now();
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    const fmt = v => Math.round(v).toLocaleString() + suffix;
+    let raf;
+    const tick = now => {
+      const p = Math.min((now - t0) / dur, 1);
+      setDisplay(fmt(target * ease(p)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else setDisplay(fmt(target));
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [active, target, suffix]);
+  return display;
+}
+
+// ── Stat card with cursor spotlight ───────────────────────────────────────
+function StatCard({ icon, target, suffix = '', label, delta, deltaDown = false, featured = false, tickActive = false }) {
+  const val = useTicker(target, suffix, tickActive);
+  const ref = useRef(null);
+  const onMove = e => {
+    const r = ref.current.getBoundingClientRect();
+    ref.current.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    ref.current.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+  const onLeave = () => { ref.current.style.setProperty('--mx', '50%'); ref.current.style.setProperty('--my', '50%'); };
+  return (
+    <div ref={ref} className={`${styles.statCard} ${featured ? styles.statFeatured : ''}`} onMouseMove={onMove} onMouseLeave={onLeave}>
+      {featured && <div className={styles.glowInner} />}
+      <div className={styles.statIcon}>{icon}</div>
+      <span className={styles.statValue}>{val}</span>
+      <div className={styles.statLabel}>{label}</div>
+      <span className={`${styles.statDelta} ${deltaDown ? styles.deltaDown : ''}`}>{delta}</span>
+    </div>
+  );
+}
+
+// ── Feature card with cursor spotlight ────────────────────────────────────
+function FeatureCard({ icon, title, desc }) {
+  const ref = useRef(null);
+  const onMove = e => {
+    const r = ref.current.getBoundingClientRect();
+    ref.current.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    ref.current.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+  const onLeave = () => { ref.current.style.setProperty('--mx', '50%'); ref.current.style.setProperty('--my', '50%'); };
+  return (
+    <div ref={ref} className={styles.featureCard} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <div className={styles.featureIconWrap}>{icon}</div>
+      <h3 className={styles.featureTitle}>{title}</h3>
+      <p className={styles.featureDesc}>{desc}</p>
+    </div>
+  );
+}
+
+const FEATURES = [
+  { icon: '✍️', title: 'Rich Text & Code',        desc: 'Switch between a beautiful rich text editor and a full syntax-highlighted code editor — your choice.' },
+  { icon: '🤝', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly from anywhere in the world.' },
+  { icon: '🔒', title: 'Password Protection',     desc: 'Lock any document with a password. Your sensitive notes stay private.' },
+  { icon: '🕑', title: 'Version History',         desc: 'Never lose your work. Browse and restore any previous save with one click.' },
+  { icon: '✨', title: 'AI Assistant',            desc: 'Fix bugs, summarize, translate, or generate a first draft — right inside the editor.' },
+  { icon: '📄', title: 'PDF Export',              desc: 'Export any document as a polished PDF with one click.' },
+];
+
+const STATS = [
+  { icon: '📄', target: 48291, suffix: '',   label: 'Documents created', delta: '↑ 12% this week', featured: true },
+  { icon: '👥', target: 3842,  suffix: '',   label: 'Active users',      delta: '↑ 8% this week' },
+  { icon: '🔗', target: 127,   suffix: 'K',  label: 'Links shared',      delta: '↑ 21% this week' },
+  { icon: '⚡', target: 14,    suffix: 'ms', label: 'Avg. save latency', delta: 'p99 · 38ms', deltaDown: true },
+];
+
+// ── Main component ─────────────────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -13,6 +90,63 @@ export default function Home() {
   const [actionError, setActionError] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Animation state
+  const [navVisible,     setNavVisible]     = useState(false);
+  const [badgeVisible,   setBadgeVisible]   = useState(false);
+  const [typedText,      setTypedText]      = useState('');
+  const [showCursor,     setShowCursor]     = useState(true);
+  const [line2Visible,   setLine2Visible]   = useState(false);
+  const [subVisible,     setSubVisible]     = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [statsVisible,   setStatsVisible]   = useState(false);
+  const [tickActive,     setTickActive]     = useState(false);
+  const [cardVisible,    setCardVisible]    = useState([false, false, false, false]);
+
+  // ── Entrance sequence ────────────────────────────────────────────────────
+  useEffect(() => {
+    const TARGET = 'Write anything.';
+    let cancelled = false;
+    const timers = [];
+    const T = (fn, ms) => { const id = setTimeout(() => !cancelled && fn(), ms); timers.push(id); };
+
+    T(() => setNavVisible(true), 50);
+    T(() => setBadgeVisible(true), 180);
+
+    T(() => {
+      let i = 0;
+      const type = () => {
+        if (cancelled) return;
+        if (i >= TARGET.length) {
+          // pause then hide cursor + snap line2
+          setTimeout(() => {
+            if (cancelled) return;
+            setShowCursor(false);
+            setLine2Visible(true);
+            T(() => setSubVisible(true), 120);
+            T(() => setActionsVisible(true), 220);
+            T(() => setStatsVisible(true), 360);
+            [0, 1, 2, 3].forEach(idx => {
+              T(() => {
+                setCardVisible(prev => { const n=[...prev]; n[idx]=true; return n; });
+                if (idx === 0) setTickActive(true);
+              }, 460 + idx * 80);
+            });
+          }, 820);
+          return;
+        }
+        setTypedText(TARGET.slice(0, i + 1));
+        i++;
+        const ch = TARGET[i - 1];
+        const delay = ch === '.' ? 150 : 44 + (Math.random() - 0.5) * 16;
+        setTimeout(type, delay);
+      };
+      type();
+    }, 380);
+
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
+  }, []);
+
+  // ── Doc creation ─────────────────────────────────────────────────────────
   const handleNewDoc = () => {
     setActionError('');
     if (isGuest && limitReached) { navigate('/signup?reason=limit'); return; }
@@ -23,9 +157,7 @@ export default function Home() {
     setShowTemplates(false);
     setActionError('');
     try {
-      const language = template.mode === 'code'
-        ? (template.language || 'javascript')
-        : 'richtext';
+      const language = template.mode === 'code' ? (template.language || 'javascript') : 'richtext';
       const res = await api.post('/docs', {
         title: template.docTitle || 'Untitled',
         content: template.content || '',
@@ -38,13 +170,16 @@ export default function Home() {
     } catch (err) {
       const code = err?.response?.data?.error;
       if (code === 'GUEST_LIMIT_REACHED') { navigate('/signup?reason=limit'); return; }
-      setActionError(getApiErrorMessage(err, 'Could not create a new document. Check server settings and try again.'));
+      setActionError(getApiErrorMessage(err, 'Could not create document.'));
     }
   };
 
   return (
     <div className={styles.home}>
-      <nav className={styles.nav}>
+      <div className={styles.bgRadial} aria-hidden="true" />
+
+      {/* NAV */}
+      <nav className={`${styles.nav} ${navVisible ? styles.show : ''}`}>
         <div className={styles.logo}>Note<span>247</span></div>
         <div className={styles.navLinks}>
           {user ? (
@@ -61,46 +196,71 @@ export default function Home() {
         </div>
       </nav>
 
-      <main className={styles.hero}>
-        <div className={styles.heroBadge}>
-          <span className="badge green">Live</span>
-          Real-time collaboration
+      {/* HERO */}
+      <section className={styles.hero}>
+        <div className={`${styles.badge} ${badgeVisible ? styles.show : ''}`}>
+          <span className={styles.dot} />
+          Real-time collaboration — Live
         </div>
+
         <h1 className={styles.heroTitle}>
-          Write anything.<br />
-          <span className={styles.heroAccent}>Share instantly.</span>
+          <span className={styles.typeLine}>
+            {typedText}
+            {showCursor && <span className={styles.cursor} aria-hidden="true">|</span>}
+          </span>
+          {/* "Share instantly." — no transition, just opacity toggled */}
+          <span className={styles.snapLine} style={{ opacity: line2Visible ? 1 : 0 }}>
+            Share instantly.
+          </span>
         </h1>
-        <p className={styles.heroSub}>
-          Notes, docs, code — all in one place. Collaborate in real‑time,<br />
+
+        <p className={`${styles.heroSub} ${subVisible ? styles.show : ''}`}>
+          Notes, docs, code — all in one place. Collaborate in real-time,
           stay organized, and never lose a version. No setup required.
         </p>
-        <div className={styles.heroActions}>
-          <button className="btn accent lg" onClick={handleNewDoc}>✨ New Document</button>
+
+        <div className={`${styles.heroActions} ${actionsVisible ? styles.show : ''}`}>
+          <button className="btn accent lg" onClick={handleNewDoc}>⚡ New Document</button>
           {isGuest && !limitReached && (
-            <span className={styles.guestNote}>{remaining} free doc{remaining !== 1 ? 's' : ''} remaining as guest</span>
+            <span className={styles.guestNote}>
+              {remaining} free doc{remaining !== 1 ? 's' : ''} remaining as guest
+            </span>
           )}
         </div>
 
         {actionError && <div className="form-error" role="alert">{actionError}</div>}
+      </section>
 
-        <div className={styles.features}>
-          {[
-            { icon: '✍️', title: 'Rich Text & Code',        desc: 'Switch between a beautiful rich text editor and a full syntax-highlighted code editor — your choice.' },
-            { icon: '🤝', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly from anywhere.' },
-            { icon: '🔒', title: 'Password Protection',     desc: 'Lock any document with a password. Your sensitive notes stay private.' },
-            { icon: '🕑', title: 'Version History',         desc: 'Never lose your work. Browse and restore any previous save.' },
-            { icon: '✨', title: 'AI Assistant',            desc: 'Improve writing, summarize, translate, or generate a first draft — right inside the editor.' },
-            { icon: '📄', title: 'PDF Export',              desc: 'Export any document as a polished PDF with one click.' },
-          ].map(f => (
-            <div className={styles.featureCard} key={f.title}>
-              <div className={styles.featureIcon}>{f.icon}</div>
-              <h3>{f.title}</h3>
-              <p>{f.desc}</p>
+      {/* STATS */}
+      <section className={`${styles.statsSection} ${statsVisible ? styles.show : ''}`}>
+        <p className={styles.statsLabel}>Platform stats</p>
+        <div className={styles.statsGrid}>
+          {STATS.map((s, i) => (
+            <div
+              key={s.label}
+              className={`${styles.cardWrap} ${cardVisible[i] ? styles.cardVisible : ''}`}
+            >
+              <StatCard {...s} tickActive={tickActive} />
             </div>
           ))}
         </div>
-      </main>
+      </section>
 
+      {/* FEATURES */}
+      <section className={styles.featuresSection}>
+        <div className={styles.sectionHeader}>
+          <p className={styles.sectionLabel}>Everything you need</p>
+          <h2 className={styles.sectionTitle}>
+            Built for developers.<br />
+            <span>Loved by everyone.</span>
+          </h2>
+        </div>
+        <div className={styles.featuresGrid}>
+          {FEATURES.map(f => <FeatureCard key={f.title} {...f} />)}
+        </div>
+      </section>
+
+      {/* FOOTER */}
       <footer className={styles.footer}>
         <span>Note247 © {new Date().getFullYear()}</span>
         {!user && <button className="btn sm ghost" onClick={() => navigate('/signup')}>Create free account</button>}

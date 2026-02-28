@@ -1,16 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Note247 — Online Code & Text Editor</title>
-    <meta name="description" content="A powerful online code and text editor with real-time collaboration, version history, and sharing." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Note247</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080809;--bg2:#0f0f12;--bg3:#18181d;--surface:#1c1c23;
+  --border:rgba(255,255,255,0.07);--border-hi:rgba(255,255,255,0.13);
+  --accent:#d4ff47;--accent2:#47ffb8;
+  --text:#f0f0f4;--text-dim:#6b6b80;--text-mid:#a0a0b8;
+  --mono:'DM Mono',monospace;
+  --display:'Syne',sans-serif;
+  --body:'Instrument Sans',sans-serif;
+  --spring:cubic-bezier(0.2,0.8,0.2,1);
+  --out:cubic-bezier(0.16,1,0.3,1);
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* grain */
+body::before{content:'';position:fixed;inset:0;z-index:0;opacity:.022;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:180px}
+
+/* ambient radials */
+.bg-radial{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80vw 55vh at 18% 0%,rgba(212,255,71,.055) 0%,transparent 60%),
+    radial-gradient(ellipse 55vw 45vh at 88% 8%,rgba(71,255,184,.04) 0%,transparent 55%)}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;
+  padding:0 clamp(20px,4vw,48px);height:58px;
+  background:rgba(8,8,9,.84);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);
+  opacity:0;transform:translateY(-8px);
+  transition:opacity .55s var(--out),transform .55s var(--out)}
+nav.show{opacity:1;transform:translateY(0)}
+.logo{font-family:var(--display);font-size:17px;font-weight:800;color:var(--accent);text-decoration:none;letter-spacing:-.5px}
+.logo span{color:var(--text)}
+.nav-r{margin-left:auto;display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 15px;
+  font-family:var(--body);font-size:13px;font-weight:600;border-radius:8px;
+  border:1px solid var(--border);background:transparent;color:var(--text-mid);
+  cursor:pointer;text-decoration:none;transition:all .14s;white-space:nowrap}
+.btn:hover{background:var(--surface);color:var(--text);border-color:var(--border-hi)}
+.btn-y{background:var(--accent);color:#080809;border-color:var(--accent)}
+.btn-y:hover{background:#c8f230;transform:translateY(-1px);box-shadow:0 4px 20px rgba(212,255,71,.3)}
+.btn-lg{padding:11px 26px;font-size:14px;border-radius:10px}
+
+/* ── HERO ── */
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:90px clamp(20px,5vw,80px) 80px;text-align:center}
+
+/* badge */
+.badge{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;
+  background:rgba(212,255,71,.06);border:1px solid rgba(212,255,71,.18);
+  border-radius:99px;font-size:11.5px;font-weight:600;color:var(--accent);
+  font-family:var(--mono);letter-spacing:.03em;margin-bottom:32px;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .6s var(--spring),transform .6s var(--spring)}
+.badge.show{opacity:1;transform:translateY(0)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}
+
+/* ── TITLE ── */
+.hero-title{
+  font-family:var(--display);
+  font-size:clamp(36px,6.5vw,74px);
+  font-weight:800;line-height:1.08;letter-spacing:-2px;
+  color:var(--text);margin-bottom:24px;
+}
+
+/* Line 1: typewriter container */
+.type-line{
+  display:block;
+  min-height:1.1em;
+}
+/* the blinking cursor — a real pipe char styled */
+.cursor{
+  display:inline;
+  color:var(--accent);
+  font-weight:300;
+  opacity:1;
+  animation:blink .55s steps(1,end) infinite;
+  /* prevent layout shift — cursor is zero width when hidden */
+  margin-left:1px;
+}
+@keyframes blink{
+  0%,49%{opacity:1}
+  50%,100%{opacity:0}
+}
+
+/* Line 2: "Share instantly." — accent, hidden, snaps in */
+.snap-line{
+  display:block;
+  color:var(--accent);
+  opacity:0;
+  /* NO transition — it snaps, as requested */
+}
+.snap-line.show{opacity:1}
+
+/* sub + actions */
+.hero-sub{font-size:clamp(15px,1.8vw,17px);color:var(--text-dim);line-height:1.7;
+  max-width:480px;margin-bottom:40px;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .65s var(--spring),transform .65s var(--spring)}
+.hero-sub.show{opacity:1;transform:translateY(0)}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .65s var(--spring),transform .65s var(--spring)}
+.hero-actions.show{opacity:1;transform:translateY(0)}
+.hero-note{font-family:var(--mono);font-size:11.5px;color:var(--text-dim)}
+
+/* ── STATS ── */
+.stats{position:relative;z-index:1;padding:0 clamp(20px,5vw,80px) 100px;
+  max-width:1200px;margin:0 auto;width:100%}
+.stats-lbl{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.12em;margin-bottom:20px;text-align:center;
+  opacity:0;transition:opacity .55s var(--out)}
+.stats-lbl.show{opacity:1}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+
+/* card */
+.card{position:relative;background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:26px 24px 24px;overflow:hidden;cursor:default;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .65s var(--spring),transform .65s var(--spring),
+    border-color .18s,box-shadow .18s}
+.card.show{opacity:1;transform:translateY(0)}
+/* spotlight */
+.card::before{content:'';position:absolute;inset:0;z-index:0;border-radius:inherit;
+  background:radial-gradient(320px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.045) 0%,transparent 70%);
+  opacity:0;transition:opacity .28s;pointer-events:none}
+.card:hover::before{opacity:1}
+.card:hover{border-color:var(--border-hi);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.card>*{position:relative;z-index:1}
+.ci{display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border-radius:9px;background:var(--surface);
+  border:1px solid var(--border);font-size:15px;margin-bottom:18px}
+.cv{display:block;font-family:var(--mono);font-size:clamp(26px,3.5vw,36px);
+  font-weight:500;color:var(--text);letter-spacing:-1.5px;line-height:1;margin-bottom:7px;min-width:4ch}
+.cl{font-size:12.5px;color:var(--text-dim);font-weight:500;margin-bottom:14px}
+.cd{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;
+  font-weight:500;padding:3px 8px;border-radius:6px;
+  background:rgba(71,255,184,.08);color:var(--accent2);border:1px solid rgba(71,255,184,.15)}
+.cd.red{background:rgba(255,107,107,.08);color:#ff6b6b;border-color:rgba(255,107,107,.15)}
+
+/* ambient glow — first card */
+@property --ang{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes spin{from{--ang:0deg}to{--ang:360deg}}
+@keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+.card-feat::after{content:'';position:absolute;inset:-1px;border-radius:17px;pointer-events:none;z-index:0;
+  background:conic-gradient(from var(--ang,0deg) at 50% 50%,
+    transparent 0deg,rgba(212,255,71,0) 55deg,rgba(212,255,71,.55) 115deg,
+    rgba(255,255,255,.22) 148deg,rgba(212,255,71,.55) 178deg,
+    rgba(212,255,71,0) 238deg,transparent 360deg);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;padding:1px;
+  animation:spin 8s linear infinite}
+.gi{position:absolute;inset:0;z-index:0;border-radius:16px;pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 28% 18%,rgba(212,255,71,.04),transparent 65%);
+  animation:breathe 8s ease-in-out infinite}
+
+/* ── FEATURES ── */
+.feats{position:relative;z-index:1;padding:0 clamp(20px,5vw,80px) 120px;max-width:1200px;margin:0 auto}
+.sh{text-align:center;margin-bottom:48px}
+.slbl{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px}
+.stit{font-family:var(--display);font-size:clamp(28px,4vw,46px);font-weight:800;
+  letter-spacing:-1.2px;line-height:1.08}
+.stit span{color:var(--text-dim)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:1px;background:var(--border);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+.fc{background:var(--bg2);padding:30px 26px;position:relative;overflow:hidden;
+  cursor:default;transition:background .18s}
+.fc::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),rgba(212,255,71,.03),transparent 70%);
+  opacity:0;transition:opacity .28s;pointer-events:none}
+.fc:hover::before{opacity:1}
+.fc:hover{background:var(--bg3)}
+.fi{width:40px;height:40px;background:var(--surface);border:1px solid var(--border);
+  border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:17px;margin-bottom:16px}
+.ft{font-size:14px;font-weight:700;margin-bottom:7px;letter-spacing:-.2px}
+.fd{font-size:13px;color:var(--text-dim);line-height:1.6}
+
+/* ── CTA ── */
+.cta-wrap{position:relative;z-index:1;padding:0 clamp(20px,5vw,80px) 120px;display:flex;justify-content:center}
+.cta{position:relative;max-width:660px;width:100%;background:var(--bg2);
+  border:1px solid var(--border);border-radius:22px;
+  padding:clamp(36px,5vw,64px) clamp(26px,5vw,64px);text-align:center;overflow:hidden}
+.cta::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(212,255,71,.055),transparent 60%);pointer-events:none}
+.cta::after{content:'';position:absolute;inset:-1px;border-radius:23px;pointer-events:none;z-index:0;
+  background:conic-gradient(from var(--ang,0deg) at 50% 50%,
+    transparent 0,rgba(212,255,71,0) 80deg,rgba(212,255,71,.28) 130deg,
+    rgba(212,255,71,.28) 230deg,rgba(212,255,71,0) 280deg,transparent 360deg);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;padding:1px;
+  animation:spin 12s linear infinite reverse}
+.cta>*{position:relative;z-index:1}
+.ct{font-family:var(--display);font-size:clamp(24px,3.5vw,38px);font-weight:800;letter-spacing:-.8px;margin-bottom:12px}
+.cs{font-size:14px;color:var(--text-dim);margin-bottom:28px;line-height:1.65}
+
+/* ── FOOTER ── */
+footer{position:relative;z-index:1;border-top:1px solid var(--border);
+  padding:22px clamp(20px,5vw,80px);display:flex;align-items:center;
+  justify-content:space-between;gap:12px;flex-wrap:wrap}
+.fl{font-family:var(--display);font-size:15px;font-weight:800;color:var(--accent)}
+.fl span{color:var(--text)}
+.fc2{font-size:11.5px;color:var(--text-dim);font-family:var(--mono)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--surface);border-radius:3px}
+
+@media(max-width:600px){
+  .grid4{grid-template-columns:repeat(2,1fr);gap:10px}
+  .hero-actions{flex-direction:column;align-items:stretch;width:100%;max-width:300px}
+  .btn-lg{justify-content:center}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div class="bg-radial"></div>
+
+<nav id="nav">
+  <a href="/" class="logo">Note<span>247</span></a>
+  <div class="nav-r">
+    <a href="/login" class="btn">Login</a>
+    <a href="/signup" class="btn btn-y">Sign Up Free</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="badge" id="badge"><span class="dot"></span>Real-time collaboration — Live</div>
+
+  <h1 class="hero-title">
+    <span class="type-line">
+      <span id="typed"></span><span class="cursor" id="cur">|</span>
+    </span>
+    <span class="snap-line" id="line2">Share instantly.</span>
+  </h1>
+
+  <p class="hero-sub" id="sub">
+    Notes, docs, code — all in one place. Collaborate in real-time,
+    stay organized, and never lose a version. No setup required.
+  </p>
+  <div class="hero-actions" id="actions">
+    <a href="/editor" class="btn btn-y btn-lg">⚡ New Document</a>
+    <span class="hero-note">3 free docs as guest · No account needed</span>
+  </div>
+</section>
+
+<section class="stats">
+  <p class="stats-lbl" id="slbl">Platform stats</p>
+  <div class="grid4">
+    <div class="card card-feat">
+      <div class="gi"></div>
+      <div class="ci">📄</div>
+      <span class="cv" data-n="48291" data-s="">0</span>
+      <div class="cl">Documents created</div>
+      <span class="cd">↑ 12% this week</span>
+    </div>
+    <div class="card">
+      <div class="ci">👥</div>
+      <span class="cv" data-n="3842" data-s="">0</span>
+      <div class="cl">Active users</div>
+      <span class="cd">↑ 8% this week</span>
+    </div>
+    <div class="card">
+      <div class="ci">🔗</div>
+      <span class="cv" data-n="127" data-s="K">0</span>
+      <div class="cl">Links shared</div>
+      <span class="cd">↑ 21% this week</span>
+    </div>
+    <div class="card">
+      <div class="ci">⚡</div>
+      <span class="cv" data-n="14" data-s="ms">0</span>
+      <div class="cl">Avg. save latency</div>
+      <span class="cd red">p99 · 38ms</span>
+    </div>
+  </div>
+</section>
+
+<section class="feats">
+  <div class="sh">
+    <p class="slbl">Everything you need</p>
+    <h2 class="stit">Built for developers.<br><span>Loved by everyone.</span></h2>
+  </div>
+  <div class="fgrid">
+    <div class="fc"><div class="fi">✨</div><h3 class="ft">AI Assistant</h3><p class="fd">Chat with Claude about your document. Fix bugs, explain code, rewrite sections — without leaving the editor.</p></div>
+    <div class="fc"><div class="fi">🔐</div><h3 class="ft">End-to-End Encrypted</h3><p class="fd">AES-256-GCM with keys derived in your browser. Note247 physically cannot read your documents.</p></div>
+    <div class="fc"><div class="fi">⚡</div><h3 class="ft">Real-Time Collaboration</h3><p class="fd">Share a link and work together instantly. Changes sync in under 20ms via WebSocket.</p></div>
+    <div class="fc"><div class="fi">👁</div><h3 class="ft">Markdown Preview</h3><p class="fd">Toggle between edit, split-pane, and full-preview modes. Rendered GFM with syntax highlighting.</p></div>
+    <div class="fc"><div class="fi">🕑</div><h3 class="ft">Version History</h3><p class="fd">Every save is a checkpoint. Browse and restore any previous version with one click.</p></div>
+    <div class="fc"><div class="fi">📁</div><h3 class="ft">Folders & Workspaces</h3><p class="fd">Organise with colour-coded folders. Move and search across your entire workspace.</p></div>
+  </div>
+</section>
+
+<section class="cta-wrap">
+  <div class="cta">
+    <h2 class="ct">Start writing in seconds.</h2>
+    <p class="cs">No account required. Create a document, share the link.<br>Sign up when you're ready to keep your work.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a href="/editor" class="btn btn-y btn-lg">⚡ Open Editor</a>
+      <a href="/signup" class="btn btn-lg">Create free account →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="fl">Note<span>247</span></div>
+  <span class="fc2">© 2026 Note247 · Encrypted. Open. Fast.</span>
+</footer>
+
+<script>
+// ── TYPEWRITER ────────────────────────────────────────────────────
+function typewrite(el, text, done) {
+  let i = 0;
+  function next() {
+    if (i >= text.length) { done(); return; }
+    el.textContent += text[i++];
+    // slight random jitter so it feels human
+    const delay = 48 + (Math.random() - 0.5) * 20
+                + (text[i-1] === '.' ? 120 : 0); // pause after period
+    setTimeout(next, delay);
+  }
+  next();
+}
+
+// ── NUMBER TICKER ─────────────────────────────────────────────────
+function tick(el) {
+  const target = +el.dataset.n;
+  const suffix = el.dataset.s || '';
+  const dur = 680, t0 = performance.now();
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const fmt  = v => (Number.isInteger(target) ? Math.round(v).toLocaleString() : v.toFixed(1)) + suffix;
+  (function f(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    el.textContent = fmt(target * ease(p));
+    if (p < 1) requestAnimationFrame(f);
+    else el.textContent = fmt(target);
+  })(t0);
+}
+
+// ── CURSOR SPOTLIGHT ──────────────────────────────────────────────
+document.querySelectorAll('.card,.fc').forEach(el => {
+  el.addEventListener('mousemove', e => {
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', ((e.clientX-r.left)/r.width*100)+'%');
+    el.style.setProperty('--my', ((e.clientY-r.top)/r.height*100)+'%');
+  });
+  el.addEventListener('mouseleave', () => {
+    el.style.setProperty('--mx','50%'); el.style.setProperty('--my','50%');
+  });
+});
+
+// ── ENTRANCE SEQUENCE ─────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const nav    = document.getElementById('nav');
+  const badge  = document.getElementById('badge');
+  const typed  = document.getElementById('typed');
+  const cur    = document.getElementById('cur');
+  const line2  = document.getElementById('line2');
+  const sub    = document.getElementById('sub');
+  const actions= document.getElementById('actions');
+  const slbl   = document.getElementById('slbl');
+  const cards  = document.querySelectorAll('.card');
+
+  // 1. nav
+  requestAnimationFrame(() => nav.classList.add('show'));
+
+  // 2. badge
+  setTimeout(() => badge.classList.add('show'), 120);
+
+  // 3. typewriter starts at 350ms
+  setTimeout(() => {
+    typewrite(typed, 'Write anything.', () => {
+      // typing done → hide cursor after 2 more blinks (~1s)
+      setTimeout(() => {
+        cur.style.display = 'none';
+
+        // "Share instantly." snaps in with zero transition
+        line2.classList.add('show');
+
+        // cascade rest
+        setTimeout(() => sub.classList.add('show'), 140);
+        setTimeout(() => actions.classList.add('show'), 240);
+        setTimeout(() => slbl.classList.add('show'), 380);
+        cards.forEach((c, i) => {
+          setTimeout(() => {
+            c.classList.add('show');
+            const v = c.querySelector('.cv');
+            if (v) tick(v);
+          }, 480 + i * 80);
+        });
+      }, 900);
+    });
+  }, 350);
+});
+</script>
+</body>
 </html>

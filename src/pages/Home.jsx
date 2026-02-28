@@ -49,7 +49,7 @@ function StatCard({ icon, target, suffix = '', label, delta, deltaDown = false, 
 }
 
 // ── Feature card with cursor spotlight ────────────────────────────────────
-function FeatureCard({ icon, title, desc }) {
+function FeatureCard({ icon, title, desc, featured = false }) {
   const ref = useRef(null);
   const onMove = e => {
     const r = ref.current.getBoundingClientRect();
@@ -58,15 +58,19 @@ function FeatureCard({ icon, title, desc }) {
   };
   const onLeave = () => { ref.current.style.setProperty('--mx', '50%'); ref.current.style.setProperty('--my', '50%'); };
   return (
-    <div ref={ref} className={styles.featureCard} onMouseMove={onMove} onMouseLeave={onLeave}>
-      <div className={styles.featureIconWrap}>{icon}</div>
-      <h3 className={styles.featureTitle}>{title}</h3>
+    <div ref={ref} className={`${styles.featureCard} ${featured ? styles.featureCardFeatured : ''}`} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <div className={`${styles.featureIconWrap} ${featured ? styles.featureIconFeatured : ''}`}>{icon}</div>
+      <h3 className={styles.featureTitle}>
+        {title}
+        {featured && <span className={styles.featureBadge}>Zero-knowledge</span>}
+      </h3>
       <p className={styles.featureDesc}>{desc}</p>
     </div>
   );
 }
 
 const FEATURES = [
+  { icon: '🔐', title: 'End-to-End Encrypted',   desc: 'Your documents are encrypted in your browser before reaching our servers. We store only ciphertext — even we cannot read your notes.', featured: true },
   { icon: '✍️', title: 'Rich Text & Code',        desc: 'Switch between a beautiful rich text editor and a full syntax-highlighted code editor — your choice.' },
   { icon: '🤝', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly from anywhere in the world.' },
   { icon: '🔒', title: 'Password Protection',     desc: 'Lock any document with a password. Your sensitive notes stay private.' },
@@ -244,6 +248,59 @@ export default function Home() {
               <StatCard {...s} tickActive={tickActive} />
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* E2EE SPOTLIGHT */}
+      <section className={styles.e2eeSection}>
+        <div className={styles.e2eeInner}>
+          <div className={styles.e2eeLeft}>
+            <div className={styles.e2eePill}>
+              <span>🔐</span> End-to-End Encrypted
+            </div>
+            <h2 className={styles.e2eeTitle}>
+              Your notes are yours.<br />
+              <span>Not ours. Not anyone's.</span>
+            </h2>
+            <p className={styles.e2eeDesc}>
+              Every document is encrypted in your browser using AES-256-GCM before a single byte leaves your device. Our servers only ever see ciphertext — even a full database breach exposes nothing readable.
+            </p>
+            <div className={styles.e2eeTechRow}>
+              <span className={styles.e2eeTechChip}>AES-256-GCM</span>
+              <span className={styles.e2eeTechChip}>PBKDF2</span>
+              <span className={styles.e2eeTechChip}>WebCrypto API</span>
+              <span className={styles.e2eeTechChip}>Recovery key</span>
+            </div>
+          </div>
+          <div className={styles.e2eeRight}>
+            <div className={styles.e2eeFlow}>
+              <div className={styles.e2eeStep}>
+                <div className={styles.e2eeStepIcon}>✍️</div>
+                <div className={styles.e2eeStepLabel}>You write</div>
+                <div className={styles.e2eeStepSub}>Plain text, in your browser</div>
+              </div>
+              <div className={styles.e2eeArrow}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div className={styles.e2eeStep}>
+                <div className={`${styles.e2eeStepIcon} ${styles.e2eeStepAccent}`}>🔑</div>
+                <div className={styles.e2eeStepLabel}>Encrypted</div>
+                <div className={styles.e2eeStepSub}>With your password-derived key</div>
+              </div>
+              <div className={styles.e2eeArrow}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div className={styles.e2eeStep}>
+                <div className={styles.e2eeStepIcon}>☁️</div>
+                <div className={styles.e2eeStepLabel}>Stored</div>
+                <div className={styles.e2eeStepSub}>Only ciphertext — unreadable</div>
+              </div>
+            </div>
+            <div className={styles.e2eeWarning}>
+              <span>⚠</span>
+              Forgot your password? Your recovery key restores access. Without either, data is unrecoverable — by design.
+            </div>
+          </div>
         </div>
       </section>
 

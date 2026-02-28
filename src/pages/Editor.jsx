@@ -89,7 +89,7 @@ function EditorInner() {
   const { user } = useAuth();
   const { isGuest } = useGuestSession();
   const { encrypt, decrypt, isEncryptionActive } = useEncryption();
-  const token = localStorage.getItem('nf_token');
+  const token = localStorage.getItem('nf_token') || null; // null for guests — socket auth skips empty strings
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [doc, setDoc] = useState(null);
@@ -152,16 +152,16 @@ function EditorInner() {
 
   // ── Socket ─────────────────────────────────────────────────────────────────
   const { connected, emitChange, emitSave } = useSocket({
-    shortId: shortId || doc?.short_id,
+    shortId: shortId || doc?.short_id,  // reconnects when doc loads on /editor route
     token, password: docPassword,
-    onDocChange: async (state) => {
-      if (state.content !== undefined) {
-        // Real-time collab: content arrives as plaintext from socket (not re-encrypted).
-        // It may still be encrypted hex if sent by an older client, so try decryptContent.
-        const plain = /^[0-9a-f]{24,}$/i.test(state.content)
-          ? await decryptContent(state.content)
-          : state.content;
-        if (plain !== contentRef.current) { isRemoteChange.current = true; setContent(plain); }
+    onDocChange: (state) => {
+      // Content over the socket is always plaintext — editors emit raw text, not ciphertext.
+      // Only DB persistence uses encryption. No decryption needed here.
+      if (state.content !== undefined && state.content !== contentRef.current) {
+        isRemoteChange.current = true;
+        setContent(state.content);
+        setCharCount(state.content.length);
+        setLineCount(state.content.split('\n').length);
       }
       if (state.language) setLanguage(state.language);
       if (state.title) setTitle(state.title);

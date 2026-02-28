@@ -121,3 +121,45 @@
 .previewContent { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); padding: 12px; margin: 0; white-space: pre-wrap; max-height: 160px; overflow-y: auto; }
 
 .modalActions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+
+/* ── ShareModal E2EE note ──────────────────────────────────────────────── */
+.e2eeNote {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(232, 255, 71, 0.05);
+  border: 1px solid rgba(232, 255, 71, 0.18);
+  border-radius: var(--radius);
+}
+
+.e2eeIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.e2eeNote strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.e2eeNote p {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.e2eeNote code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--accent);
+}

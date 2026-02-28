@@ -198,3 +198,60 @@ export async function exportKeyHex(key) {
   const raw = await crypto.subtle.exportKey('raw', key);
   return bytesToHex(new Uint8Array(raw));
 }
+
+// ─── Per-Document Key Helpers ────────────────────────────────────────────────
+
+/**
+ * Generates a fresh random AES-256-GCM key for a single document.
+ * This key is distinct from the user's session key and travels in the URL hash.
+ */
+export async function generateDocKey() {
+  return crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true, // extractable so we can export it into the URL
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Exports a CryptoKey to URL-safe base64 (no +, /, or = padding).
+ */
+export async function exportKeyToBase64(key) {
+  const raw = await crypto.subtle.exportKey('raw', key);
+  const bytes = new Uint8Array(raw);
+  let str = '';
+  for (const b of bytes) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Imports a URL-safe base64 string back into an AES-GCM CryptoKey.
+ */
+export async function importKeyFromBase64(b64) {
+  const normalized = b64.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = (4 - (normalized.length % 4)) % 4;
+  const padded = normalized + '='.repeat(padding);
+  const str = atob(padded);
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+  return crypto.subtle.importKey(
+    'raw', bytes,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Imports an AES-GCM CryptoKey from a raw hex string.
+ * Used to reconstruct a per-document key stored as encrypted hex.
+ */
+export async function importKeyFromHex(hex) {
+  const bytes = hexToBytes(hex);
+  return crypto.subtle.importKey(
+    'raw', bytes,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}

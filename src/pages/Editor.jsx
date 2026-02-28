@@ -4,6 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { useGuestSession } from '../hooks/useGuestSession';
 import { useSocket } from '../hooks/useSocket';
 import { useEncryption } from '../hooks/useEncryption';
+import {
+  generateDocKey, exportKeyToBase64, importKeyFromBase64,
+  encryptText, decryptText, exportKeyHex, importKeyFromHex,
+  getSessionKey,
+} from '../utils/crypto';
 import api from '../utils/api';
 import CodeMirrorEditor from '../components/CodeMirrorEditor';
 import RichTextEditor from '../components/RichTextEditor';
@@ -112,6 +117,7 @@ function EditorInner() {
   const [showAI, setShowAI] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [wordCount, setWordCount] = useState(0);
+  const [docKey, setDocKey] = useState(null);   // per-document AES key
   const [prevCodeLang, setPrevCodeLang] = useState('plaintext'); // for toggling back from richtext
   const [tabs, setTabs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TABS_KEY) || '[]'); }
@@ -133,6 +139,7 @@ function EditorInner() {
   const shortIdRef = useRef(shortId);
   const docRef = useRef(doc);
   const userRef = useRef(user);
+  const docKeyRef = useRef(null); // always current, safe to call from effects
 
   // Keep all refs in sync with their state counterparts every render
   contentRef.current = content;
@@ -141,6 +148,7 @@ function EditorInner() {
   shortIdRef.current = shortId;
   docRef.current = doc;
   userRef.current = user;
+  docKeyRef.current = docKey;
 
   // ── Socket ─────────────────────────────────────────────────────────────────
   const { connected, emitChange, emitSave } = useSocket({
@@ -148,7 +156,11 @@ function EditorInner() {
     token, password: docPassword,
     onDocChange: async (state) => {
       if (state.content !== undefined) {
-        const plain = await decrypt(state.content);
+        // Real-time collab: content arrives as plaintext from socket (not re-encrypted).
+        // It may still be encrypted hex if sent by an older client, so try decryptContent.
+        const plain = /^[0-9a-f]{24,}$/i.test(state.content)
+          ? await decryptContent(state.content)
+          : state.content;
         if (plain !== contentRef.current) { isRemoteChange.current = true; setContent(plain); }
       }
       if (state.language) setLanguage(state.language);
@@ -178,18 +190,63 @@ function EditorInner() {
   const addToastRef = useRef(addToast);
   addToastRef.current = addToast;
 
+  // ── Per-document key helpers ───────────────────────────────────────────────
+  // Encrypts with per-doc key; falls back to session-key encrypt for guests.
+  const encryptContent = useCallback(async (plaintext) => {
+    const key = docKeyRef.current;
+    if (!key) return encrypt(plaintext); // guest path (no doc key)
+    return encryptText(plaintext, key);
+  }, [encrypt]);
+
+  // Decrypts with per-doc key if available; falls back to session key (legacy docs).
+  const decryptContent = useCallback(async (ciphertext) => {
+    if (!ciphertext) return '';
+    const key = docKeyRef.current;
+    const looksEncrypted = /^[0-9a-f]{24,}$/i.test(ciphertext);
+    if (!looksEncrypted) return ciphertext; // plain text (guest or pre-encryption doc)
+    if (key) {
+      try { return await decryptText(ciphertext, key); } catch (_) {}
+    }
+    // Fall back to session-key decrypt (legacy docs encrypted before per-doc key scheme)
+    return decrypt(ciphertext);
+  }, [decrypt]);
+
   const doSave = useCallback(async (saveVersion = false) => {
     const sid = shortIdRef.current || docRef.current?.short_id;
     const currentContent = contentRef.current;
     const currentTitle = titleRef.current;
     const currentLanguage = languageRef.current;
 
+    // Ensure we have a per-doc key if user is logged in
+    // (guests save plaintext; no docKey needed)
+    let currentDocKey = docKeyRef.current;
+    let encrypted_doc_key;
+    if (!currentDocKey && userRef.current) {
+      try {
+        currentDocKey = await generateDocKey();
+        setDocKey(currentDocKey);
+        docKeyRef.current = currentDocKey;
+      } catch { /* crypto unavailable — fall back to legacy encrypt */ }
+    }
+    // Wrap doc key with session key so owner can recover it later
+    if (currentDocKey && userRef.current) {
+      try {
+        const sessionKey = getSessionKey();
+        if (sessionKey) {
+          const rawHex = await exportKeyHex(currentDocKey);
+          encrypted_doc_key = await encryptText(rawHex, sessionKey);
+        }
+      } catch { /* non-fatal */ }
+    }
+
     if (!sid) {
-      // No doc yet (/editor blank route) — create one
       setSaveStatus('saving');
       try {
-        const encryptedContent = await encrypt(currentContent);
-        const res = await api.post('/docs', { title: currentTitle, content: encryptedContent, language: currentLanguage });
+        const encryptedContent = await encryptContent(currentContent);
+        const res = await api.post('/docs', {
+          title: currentTitle, content: encryptedContent,
+          language: currentLanguage, encrypted_doc_key,
+        });
         const newDoc = res.data.document;
         setDoc(newDoc);
         navigate(`/s/${newDoc.short_id}`, { replace: true });
@@ -205,12 +262,17 @@ function EditorInner() {
 
     setSaveStatus('saving');
     try {
-      const encryptedContent = await encrypt(currentContent);
+      const encryptedContent = await encryptContent(currentContent);
       if (userRef.current) {
         emitSaveRef.current(saveVersion);
-        await api.put(`/docs/${sid}`, { content: encryptedContent, title: currentTitle, language: currentLanguage, saveVersion });
+        await api.put(`/docs/${sid}`, {
+          content: encryptedContent, title: currentTitle,
+          language: currentLanguage, saveVersion, encrypted_doc_key,
+        });
       } else {
-        await api.put(`/docs/${sid}`, { content: encryptedContent, title: currentTitle, language: currentLanguage });
+        await api.put(`/docs/${sid}`, {
+          content: encryptedContent, title: currentTitle, language: currentLanguage,
+        });
       }
       setSaveStatus('saved');
       setLastSaved(new Date());
@@ -219,7 +281,7 @@ function EditorInner() {
       setSaveStatus('unsaved');
       addToastRef.current('❌ Save failed', 'error');
     }
-  }, [encrypt, navigate]);
+  }, [encryptContent, navigate]);
 
   // Keep doSave in a ref so scheduleAutoSave and keyboard handler always call the latest version
   doSaveRef.current = doSave;
@@ -285,7 +347,10 @@ function EditorInner() {
     return () => document.removeEventListener('keydown', handler);
   }, []); // intentionally empty — doSaveRef is always current
 
-  // Load doc
+  // Load doc — resolves the per-document decryption key from:
+  //  1. URL hash (#k=BASE64) — anyone with the share link can decrypt
+  //  2. Server-returned encrypted_doc_key (owner only) — unwrapped with session key
+  //  3. Legacy fallback: session-key-based decrypt (pre-per-doc-key docs)
   useEffect(() => {
     if (!shortId) { setLoading(false); return; }
     let cancelled = false;
@@ -296,7 +361,49 @@ function EditorInner() {
         if (cancelled) return;
         const d = res.data.document;
         setDoc(d);
-        const plain = await decrypt(d.content);
+
+        // ── Resolve the doc key ─────────────────────────────────────────────
+        let resolvedKey = null;
+
+        // Priority 1: key in URL hash (share link) — works for anyone, no login needed
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const hashKeyB64 = hashParams.get('k');
+        if (hashKeyB64) {
+          try {
+            resolvedKey = await importKeyFromBase64(hashKeyB64);
+          } catch { /* malformed key in URL — fall through */ }
+        }
+
+        // Priority 2: encrypted_doc_key from server (returned for owner only)
+        if (!resolvedKey && d.encrypted_doc_key) {
+          try {
+            const sessionKey = getSessionKey();
+            if (sessionKey) {
+              const rawHex = await decryptText(d.encrypted_doc_key, sessionKey);
+              resolvedKey = await importKeyFromHex(rawHex);
+            }
+          } catch { /* session key mismatch or legacy doc — fall through */ }
+        }
+
+        if (resolvedKey) {
+          setDocKey(resolvedKey);
+          docKeyRef.current = resolvedKey;
+        }
+
+        // ── Decrypt content with resolved key (or legacy session key) ───────
+        let plain;
+        if (resolvedKey && d.content && /^[0-9a-f]{24,}$/i.test(d.content)) {
+          try {
+            plain = await decryptText(d.content, resolvedKey);
+          } catch {
+            // Key doesn't match this content — show encrypted fallback
+            plain = await decrypt(d.content);
+          }
+        } else {
+          // Guest doc (plaintext), legacy session-key doc, or empty
+          plain = await decrypt(d.content);
+        }
+
         if (cancelled) return;
         setContent(plain);
         setCharCount(plain.length);
@@ -427,7 +534,12 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
     setShowTemplates(false);
     const language = template.mode === 'code' ? (template.language || 'javascript') : 'richtext';
     try {
-      const encContent = await encrypt(template.content || '');
+      // Generate a doc key for this new tab doc if user is logged in
+      let tabDocKey = docKeyRef.current;
+      if (!tabDocKey && user) {
+        try { tabDocKey = await generateDocKey(); setDocKey(tabDocKey); docKeyRef.current = tabDocKey; } catch {}
+      }
+      const encContent = await encryptContent(template.content || '');
       const res = await api.post('/docs', { title: template.docTitle || 'Untitled', content: encContent, language });
       const newDoc = res.data.document;
       navigate(`/s/${newDoc.short_id}`);
@@ -694,7 +806,7 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
       {showVersions && (
         <VersionsModal shortId={shortId || doc?.short_id}
           onRestore={async (v) => {
-            const plain = await decrypt(v.content);
+            const plain = await decryptContent(v.content);
             setContent(plain); setTitle(v.title); setLanguage(v.language);
             scheduleAutoSave(); setShowVersions(false); addToast('✅ Version restored');
           }}
@@ -702,6 +814,7 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
       )}
       {showShare && (
         <ShareModal shortId={shortId || doc?.short_id} title={title}
+          docKey={docKey}
           onClose={() => setShowShare(false)} onCopy={() => addToast('🔗 Link copied!')} />
       )}
       {showPasswordModal && (

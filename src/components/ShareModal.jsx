@@ -1,15 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { exportKeyToBase64 } from '../utils/crypto';
 import styles from './Modal.module.css';
 
-export function ShareModal({ shortId, title, onClose, onCopy }) {
-  const shareUrl = `${window.location.origin}/s/${shortId}`;
+export function ShareModal({ shortId, title, docKey, onClose, onCopy }) {
+  const [shareUrl, setShareUrl] = useState(`${window.location.origin}/s/${shortId}`);
+  const [buildingUrl, setBuildingUrl] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const copy = () => {
-    navigator.clipboard.writeText(shareUrl)
-      .then(() => onCopy?.())
-      .catch(() => {});
+  // Build the share URL: base URL + #k=BASE64_DOC_KEY (if E2EE doc)
+  useEffect(() => {
+    if (!docKey) return; // guest doc or pre-E2EE doc — base URL is fine
+    setBuildingUrl(true);
+    exportKeyToBase64(docKey)
+      .then(b64 => {
+        setShareUrl(`${window.location.origin}/s/${shortId}#k=${b64}`);
+      })
+      .catch(() => {
+        // Non-fatal: URL without key still works for non-encrypted docs
+      })
+      .finally(() => setBuildingUrl(false));
+  }, [shortId, docKey]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      onCopy?.();
+    } catch {}
   };
+
+  const isE2EE = !!docKey;
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -21,12 +43,32 @@ export function ShareModal({ shortId, title, onClose, onCopy }) {
         <div className={styles.body}>
           <label className={styles.label}>Share Link</label>
           <div className={styles.urlRow}>
-            <input className={styles.urlInput} value={shareUrl} readOnly />
-            <button className={styles.copyBtn} onClick={copy}>Copy</button>
+            <input
+              className={styles.urlInput}
+              value={buildingUrl ? 'Building secure link…' : shareUrl}
+              readOnly
+            />
+            <button className={styles.copyBtn} onClick={copy} disabled={buildingUrl}>
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
           </div>
-          <p className={styles.note}>
-            Anyone with this link can view this document.
-          </p>
+
+          {isE2EE ? (
+            <div className={styles.e2eeNote}>
+              <span className={styles.e2eeIcon}>🔐</span>
+              <div>
+                <strong>End-to-end encrypted link</strong>
+                <p>
+                  The decryption key is embedded in the link after <code>#k=</code>.
+                  Anyone with the full URL can read this document — the key never reaches our servers.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.note}>
+              Anyone with this link can view this document.
+            </p>
+          )}
         </div>
       </div>
     </div>

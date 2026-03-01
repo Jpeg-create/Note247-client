@@ -86,7 +86,7 @@ export default function Editor() {
 function EditorInner() {
   const { shortId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, sessionKeyMissing, clearSessionKeyMissing } = useAuth();
   const { isGuest } = useGuestSession();
   const { encrypt, decrypt, isEncryptionActive } = useEncryption();
   const token = localStorage.getItem('nf_token') || null; // null for guests — socket auth skips empty strings
@@ -452,7 +452,7 @@ function EditorInner() {
     };
     load();
     return () => { cancelled = true; };
-  }, [shortId, docPassword, decrypt, navigate]);
+  }, [shortId, docPassword, decrypt]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -852,7 +852,10 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
         <VersionsModal shortId={shortId || doc?.short_id}
           onRestore={async (v) => {
             const plain = await decryptContent(v.content);
-            setContent(plain); setTitle(v.title); setLanguage(v.language);
+            // Batch all three state updates together to avoid unnecessary re-renders
+            setContent(plain);
+            setTitle(v.title);
+            setLanguage(v.language);
             scheduleAutoSave(); setShowVersions(false); addToast('✅ Version restored');
           }}
           onClose={() => setShowVersions(false)} />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const GUEST_LIMIT = parseInt(import.meta.env.VITE_GUEST_DOC_LIMIT || '3', 10) || 3;
+const GUEST_LIMIT = parseInt(import.meta.env.VITE_GUEST_DOC_LIMIT || '5', 10) || 5;
 const STORAGE_KEY = 'nf_guest_docs';
 
 export const useGuestSession = () => {

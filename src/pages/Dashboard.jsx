@@ -47,6 +47,10 @@ export default function Dashboard() {
   // Search
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Custom confirm modal (replaces window.confirm — blocked in iframes/some browsers)
+  const [confirmModal, setConfirmModal] = useState(null);
+  const confirm = (message, onConfirm) => setConfirmModal({ message, onConfirm });
+
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     fetchAll();
@@ -84,14 +88,15 @@ export default function Dashboard() {
     }
   };
 
-  const deleteDoc = async (shortId) => {
-    if (!window.confirm('Delete this document? This cannot be undone.')) return;
-    try {
-      await api.delete(`/docs/${shortId}`);
-      setDocs(prev => prev.filter(d => d.short_id !== shortId));
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not delete document.'));
-    }
+  const deleteDoc = (shortId) => {
+    confirm('Delete this document? This cannot be undone.', async () => {
+      try {
+        await api.delete(`/docs/${shortId}`);
+        setDocs(prev => prev.filter(d => d.short_id !== shortId));
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Could not delete document.'));
+      }
+    });
   };
 
   const copyLink = async (shortId) => {
@@ -114,14 +119,15 @@ export default function Dashboard() {
     }
   };
 
-  const deleteFolder = async (folderId) => {
-    if (!window.confirm('Delete folder? Documents inside will become unfiled.')) return;
-    try {
-      await api.delete(`/folders/${folderId}`);
-      setFolders(prev => prev.filter(f => f.id !== folderId));
-      setDocs(prev => prev.map(d => d.folder_id === folderId ? { ...d, folder_id: null } : d));
-      if (activeFolder === folderId) setActiveFolder(null);
-    } catch { setError('Could not delete folder.'); }
+  const deleteFolder = (folderId) => {
+    confirm('Delete folder? Documents inside will become unfiled.', async () => {
+      try {
+        await api.delete(`/folders/${folderId}`);
+        setFolders(prev => prev.filter(f => f.id !== folderId));
+        setDocs(prev => prev.map(d => d.folder_id === folderId ? { ...d, folder_id: null } : d));
+        if (activeFolder === folderId) setActiveFolder(null);
+      } catch { setError('Could not delete folder.'); }
+    });
   };
 
   const moveDocToFolder = async (shortId, folderId) => {
@@ -324,6 +330,21 @@ export default function Dashboard() {
       )}
       {showTemplates && (
         <TemplateModal onSelect={createDocFromTemplate} onClose={() => setShowTemplates(false)} />
+      )}
+
+      {confirmModal && (
+        <div className="overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <p style={{ marginBottom: 20 }}>{confirmModal.message}</p>
+            <div className="modal-actions">
+              <button className="btn ghost" onClick={() => setConfirmModal(null)}>Cancel</button>
+              <button className="btn accent" onClick={async () => {
+                setConfirmModal(null);
+                await confirmModal.onConfirm();
+              }}>Confirm</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

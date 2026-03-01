@@ -155,16 +155,19 @@ function EditorInner() {
     shortId: shortId || doc?.short_id,  // reconnects when doc loads on /editor route
     token, password: docPassword,
     onDocChange: (state) => {
-      // Content over the socket is always plaintext — editors emit raw text, not ciphertext.
-      // Only DB persistence uses encryption. No decryption needed here.
-      if (state.content !== undefined && state.content !== contentRef.current) {
-        isRemoteChange.current = true;
-        setContent(state.content);
-        setCharCount(state.content.length);
-        setLineCount(state.content.split('\n').length);
+      // Content arrives as plaintext (never re-encrypted over the socket).
+      // fromSave=true means this was pushed after an HTTP save — always apply it.
+      // Regular keystroke events: only apply if content actually changed.
+      if (state.content !== undefined) {
+        const isDifferent = state.content !== contentRef.current;
+        if (isDifferent || state.fromSave) {
+          isRemoteChange.current = true;
+          setContent(state.content);
+          // Don't update char/line count here — that's for the local editor only
+        }
       }
-      if (state.language) setLanguage(state.language);
-      if (state.title) setTitle(state.title);
+      if (state.language && state.language !== languageRef.current) setLanguage(state.language);
+      if (state.title && state.title !== titleRef.current) setTitle(state.title);
     },
     onCollaboratorsUpdate: setCollaborators,
     onSaveSuccess: (data) => {

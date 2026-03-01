@@ -30,11 +30,16 @@ export default function RichTextEditor({ value, onChange, isDark, onWordCount })
   const [tableCols, setTableCols] = useState(3);
   const savedRangeRef = useRef(null);
 
-  // Sync value into DOM when parent updates it (e.g. on load)
+  // Sync value into DOM when parent updates it (remote change or initial load).
+  // Setting innerHTML programmatically does NOT fire oninput, so there's no loop risk.
+  // We skip the update if the DOM already has this exact content to avoid cursor jumps
+  // when the user is actively typing locally.
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    if (value !== lastHtml.current) {
+    // If the user is currently typing (isInternalChange tracks this), skip.
+    // Otherwise always apply — this ensures remote changes always render.
+    if (!isInternalChange.current && el.innerHTML !== (value || '')) {
       isInternalChange.current = true;
       el.innerHTML = value || '';
       lastHtml.current = value || '';

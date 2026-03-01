@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const GUEST_LIMIT = parseInt(import.meta.env.VITE_GUEST_DOC_LIMIT || '3');
+const GUEST_LIMIT = parseInt(import.meta.env.VITE_GUEST_DOC_LIMIT || '3', 10) || 3;
 const STORAGE_KEY = 'nf_guest_docs';
 
 export const useGuestSession = () => {
@@ -16,9 +16,12 @@ export const useGuestSession = () => {
   const limitReached = isGuest && guestDocCount >= GUEST_LIMIT;
   const remaining = Math.max(0, GUEST_LIMIT - guestDocCount);
 
+  const MAX_GUEST_DOCS_STORED = 20;
+
   const addGuestDoc = (shortId) => {
     if (!isGuest) return;
-    const updated = [...new Set([...guestDocs, shortId])];
+    // Deduplicate, then keep only the most recent MAX_GUEST_DOCS_STORED entries
+    const updated = [...new Set([...guestDocs, shortId])].slice(-MAX_GUEST_DOCS_STORED);
     setGuestDocs(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   };

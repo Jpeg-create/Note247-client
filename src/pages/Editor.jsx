@@ -633,6 +633,28 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
   return (
     <div className={`${styles.editorPage} ${isDark ? '' : 'light'}`}>
 
+      {/* ── SESSION KEY MISSING BANNER (shows after page refresh for logged-in users) ── */}
+      {sessionKeyMissing && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#ff9944', color: '#000', padding: '10px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: 14, fontWeight: 600,
+        }}>
+          <span>🔐 Encryption unavailable after page refresh. Re-login to restore it — your content is safe.</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { window.location.href = '/login'; }}
+              style={{ background: '#000', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>
+              Re-login
+            </button>
+            <button onClick={clearSessionKeyMissing}
+              style={{ background: 'transparent', border: '1px solid #000', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── TAB BAR ── */}
       {tabs.length > 0 && (
         <div className={styles.tabBar}>

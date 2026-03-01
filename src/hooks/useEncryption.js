@@ -1,13 +1,20 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { encryptText, decryptText, getSessionKey } from '../utils/crypto';
+import { encryptText, decryptText, getSessionKey, setSessionKey as _setSessionKey } from '../utils/crypto';
 
 /**
  * Hook that provides encrypt/decrypt functions bound to the current session key.
- * If no session key (guest or not logged in), returns content as-is.
+ * isEncryptionActive is reactive — updates when the session key is set after login.
  */
 export const useEncryption = () => {
   const { user } = useAuth();
+  // Track session key reactively so isEncryptionActive updates after login/logout
+  const [hasKey, setHasKey] = useState(() => !!getSessionKey());
+
+  useEffect(() => {
+    // Re-check whenever user changes (login/logout)
+    setHasKey(!!getSessionKey());
+  }, [user]);
 
   const encrypt = useCallback(async (plaintext) => {
     const key = getSessionKey();
@@ -37,7 +44,7 @@ export const useEncryption = () => {
     }
   }, [user]);
 
-  const isEncryptionActive = !!(getSessionKey() && user);
+  const isEncryptionActive = !!(hasKey && user);
 
   return { encrypt, decrypt, isEncryptionActive };
 };

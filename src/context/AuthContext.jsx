@@ -17,6 +17,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionKeyMissing, setSessionKeyMissing] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('nf_token');
@@ -24,7 +25,13 @@ export const AuthProvider = ({ children }) => {
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
       api.get('/auth/me')
-        .then(res => setUser(res.data.user))
+        .then(res => {
+          setUser(res.data.user);
+          // Session key is a module-scope variable that resets on every page load.
+          // If it's null here, the user refreshed the page and we can't re-derive
+          // the key without their password. Show a banner prompting re-login.
+          if (!getSessionKey()) setSessionKeyMissing(true);
+        })
         .catch((err) => {
           if (err?.response?.status === 401) logout();
         })
@@ -77,6 +84,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('nf_user', JSON.stringify(res.data.user));
       setSessionKey(encryptionKey);
       setUser(res.data.user);
+      setSessionKeyMissing(false);
       return res.data;
     } catch (err) {
       throw new Error(getApiErrorMessage(err, 'Login failed'));
@@ -123,8 +131,10 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const clearSessionKeyMissing = () => setSessionKeyMissing(false);
+
   return (
-    <AuthContext.Provider value={{ user, loading, getEncryptionKey: getSessionKey, login, signup, recoverAccount, logout }}>
+    <AuthContext.Provider value={{ user, loading, sessionKeyMissing, clearSessionKeyMissing, getEncryptionKey: getSessionKey, login, signup, recoverAccount, logout }}>
       {children}
     </AuthContext.Provider>
   );

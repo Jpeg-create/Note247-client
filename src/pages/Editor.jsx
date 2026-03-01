@@ -286,6 +286,21 @@ function EditorInner() {
   // Keep doSave in a ref so scheduleAutoSave and keyboard handler always call the latest version
   doSaveRef.current = doSave;
 
+  // handleShare — ensures the doc is saved (encrypted_doc_key persisted to DB) before
+  // opening the share modal. If the doc has never been saved, save it now first.
+  const handleShare = useCallback(async () => {
+    const currentShortId = shortIdRef.current || docRef.current?.short_id;
+    const needsSave = !currentShortId || saveStatus === 'unsaved' || !docKeyRef.current;
+    if (needsSave && contentRef.current) {
+      try {
+        await doSaveRef.current(false);
+      } catch {
+        // Non-fatal — open modal anyway so user can at least copy the URL
+      }
+    }
+    setShowShare(true);
+  }, [saveStatus]);
+
   const scheduleAutoSave = useCallback(() => {
     setSaveStatus('unsaved');
     clearTimeout(autoSaveTimer.current);
@@ -390,19 +405,24 @@ function EditorInner() {
           docKeyRef.current = resolvedKey;
         }
 
-        // ── Decrypt content with resolved key (or legacy session key) ───────
-        let plain;
-        if (resolvedKey && d.content && /^[0-9a-f]{24,}$/i.test(d.content)) {
+        // ── Decrypt content ─────────────────────────────────────────────────
+        let plain = d.content || '';
+        const looksEncrypted = plain && /^[0-9a-f]{48,}$/i.test(plain);
+
+        if (looksEncrypted && resolvedKey) {
+          // E2EE doc opened with hash key (share link path) or owner
           try {
-            plain = await decryptText(d.content, resolvedKey);
+            plain = await decryptText(plain, resolvedKey);
           } catch {
-            // Key doesn't match this content — show encrypted fallback
-            plain = await decrypt(d.content);
+            // Hash key doesn't match — try legacy session-key decrypt
+            try { plain = await decrypt(plain); } catch { plain = ''; }
           }
-        } else {
-          // Guest doc (plaintext), legacy session-key doc, or empty
-          plain = await decrypt(d.content);
+        } else if (looksEncrypted && !resolvedKey) {
+          // Encrypted content but no key available (e.g. owner on a new device
+          // before re-login). Try session key; if that fails show empty.
+          try { plain = await decrypt(plain); } catch { plain = ''; }
         }
+        // else: plaintext doc — use as-is (plain is already d.content)
 
         if (cancelled) return;
         setContent(plain);
@@ -417,7 +437,7 @@ function EditorInner() {
         if (err.response?.status === 423 || err.response?.data?.passwordRequired) {
           setPasswordRequired(true);
         } else if (err.response?.status === 403) {
-          navigate('/');
+          setLoadDocError('This document is private. Ask the owner to share the link with you.');
         } else if (err.response?.status === 404) {
           setLoadDocError('Document not found.');
         } else {
@@ -686,7 +706,7 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
           <div className={`${styles.connDot} ${connected ? styles.connGreen : styles.connRed}`} />
           <button className="btn sm ghost" onClick={() => setShowVersions(true)}>🕑</button>
           <button className="btn sm ghost" onClick={() => setShowPasswordModal(true)}>🔒</button>
-          <button className="btn sm ghost" onClick={() => setShowShare(true)}>🔗</button>
+          <button className="btn sm ghost" onClick={handleShare}>🔗</button>
           <button className={`btn sm ghost ${showAI ? styles.activeBtn : ''}`} onClick={() => setShowAI(v => !v)} title="AI Assistant">✨ AI</button>
           <button className="btn sm ghost" onClick={() => setIsDark(d => !d)}>{isDark ? '☀️' : '🌙'}</button>
           {!user && <button className="btn sm accent" onClick={() => navigate('/signup')}>Sign Up</button>}
@@ -717,7 +737,7 @@ ${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&
                 )}
                 <button className={styles.mobileMenuItem} onClick={() => { doSave(true); setMobileMenuOpen(false); }}>💾 Save Version</button>
                 <button className={styles.mobileMenuItem} onClick={() => { setShowVersions(true); setMobileMenuOpen(false); }}>🕑 Version History</button>
-                <button className={styles.mobileMenuItem} onClick={() => { setShowShare(true); setMobileMenuOpen(false); }}>🔗 Share Link</button>
+                <button className={styles.mobileMenuItem} onClick={() => { handleShare(); setMobileMenuOpen(false); }}>🔗 Share Link</button>
                 <button className={styles.mobileMenuItem} onClick={() => { setShowPasswordModal(true); setMobileMenuOpen(false); }}>🔒 Set Password</button>
                 <button className={styles.mobileMenuItem} onClick={handleExport}>↓ Export File</button>
                 <button className={styles.mobileMenuItem} onClick={handleExportPDF}>📄 Export as PDF</button>

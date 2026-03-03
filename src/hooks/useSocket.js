@@ -126,5 +126,6 @@ export const useSocket = ({
     socketRef.current.emit('save-doc', { shortId: sid, saveVersion });
   }, []);
 
-  return { connected, emitChange, emitCursor, emitSave };
+  const getSocketId = () => socketRef.current?.id || null;
+return { connected, emitChange, emitCursor, emitSave, getSocketId };
 };

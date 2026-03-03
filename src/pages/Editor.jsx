@@ -151,7 +151,7 @@ function EditorInner() {
   docKeyRef.current = docKey;
 
   // ── Socket ─────────────────────────────────────────────────────────────────
-  const { connected, emitChange, emitSave } = useSocket({
+  const { connected, emitChange, emitSave, getSocketId } = useSocket({
     shortId: shortId || doc?.short_id,  // reconnects when doc loads on /editor route
     token, password: docPassword,
     onDocChange: (state) => {
@@ -271,10 +271,12 @@ function EditorInner() {
         await api.put(`/docs/${sid}`, {
           content: encryptedContent, title: currentTitle,
           language: currentLanguage, saveVersion, encrypted_doc_key,
+          socketId: getSocketId(),
         });
       } else {
         await api.put(`/docs/${sid}`, {
           content: encryptedContent, title: currentTitle, language: currentLanguage,
+          socketId: getSocketId(),
         });
       }
       setSaveStatus('saved');

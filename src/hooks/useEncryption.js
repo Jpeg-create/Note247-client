@@ -38,9 +38,10 @@ export const useEncryption = () => {
     try {
       return await decryptText(ciphertext, key);
     } catch (err) {
-      // Could be a doc from before encryption was enabled, or wrong key
-      console.warn('Decryption failed — returning raw content');
-      return ciphertext;
+      // Decryption failed — wrong key or legacy plaintext that looked like hex.
+      // Return empty string rather than raw ciphertext to avoid leaking it into the UI.
+      console.warn('Decryption failed — content unavailable');
+      return '';
     }
   }, [user]);
 

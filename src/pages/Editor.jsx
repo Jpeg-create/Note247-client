@@ -567,19 +567,20 @@ ${isRich ? contentRef.current : `<pre><code>${escHtml(contentRef.current)}</code
     setShowTemplates(false);
     const language = template.mode === 'code' ? (template.language || 'javascript') : 'richtext';
     try {
-      // Generate a doc key for this new tab doc if user is logged in
-      let tabDocKey = docKeyRef.current;
-      if (!tabDocKey && user) {
-        try { tabDocKey = await generateDocKey(); setDocKey(tabDocKey); docKeyRef.current = tabDocKey; } catch {}
-      }
-      const encContent = await encryptContent(template.content || '');
-      const res = await api.post('/docs', { title: template.docTitle || 'Untitled', content: encContent, language });
+      // Post plaintext — do NOT encrypt here because encrypted_doc_key would never be saved,
+      // making the content permanently unreadable (causes raw ciphertext to display on load).
+      // doSave() handles encryption correctly on the first auto-save after the user starts editing.
+      const res = await api.post('/docs', {
+        title: template.docTitle || 'Untitled',
+        content: template.content || '',
+        language,
+      });
       const newDoc = res.data.document;
       navigate(`/s/${newDoc.short_id}`);
     } catch {
       addToastRef.current('❌ Could not create document', 'error');
     }
-  }, [encrypt, navigate]);
+  }, [navigate]);
 
   const closeTab = useCallback((tabShortId, e) => {
     e.stopPropagation();

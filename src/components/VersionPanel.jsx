@@ -11,7 +11,7 @@ export default function VersionPanel({ shortId, onRestore, onClose }) {
 
   useEffect(() => {
     api.get(`/docs/${shortId}/versions`)
-      .then(r => setVersions(r.data))
+      .then(r => setVersions(r.data.versions || []))
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [shortId])
@@ -43,7 +43,7 @@ export default function VersionPanel({ shortId, onRestore, onClose }) {
             >
               <div className={styles.itemTop}>
                 <span className={styles.itemTitle}>{v.title || 'Untitled'}</span>
-                <span className={styles.itemChars}>{v.content_length} chars</span>
+                <span className={styles.itemChars}>{v.language}</span>
               </div>
               <div className={styles.itemMeta}>
                 <span>{v.saved_by_name || 'Unknown'}</span>

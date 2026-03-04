@@ -497,8 +497,16 @@ function EditorInner() {
     const lang = languageRef.current;
     const isRich = lang === 'richtext';
 
+    // Escape helper — prevents XSS when user-controlled values are embedded in HTML
+    const escHtml = (str) => str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
     // Build printable HTML
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
 <style>
   body { font-family: Georgia, serif; font-size: 13pt; line-height: 1.75; color: #111;
          max-width: 720px; margin: 40px auto; padding: 0 32px; }
@@ -515,8 +523,8 @@ function EditorInner() {
   @media print { body { margin: 20px; } }
 </style>
 </head><body>
-<h1>${title}</h1>
-${isRich ? contentRef.current : `<pre><code>${contentRef.current.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`}
+<h1>${escHtml(title)}</h1>
+${isRich ? contentRef.current : `<pre><code>${escHtml(contentRef.current)}</code></pre>`}
 </body></html>`;
 
     const blob = new Blob([html], { type: 'text/html' });

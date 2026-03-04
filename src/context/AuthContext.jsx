@@ -113,6 +113,7 @@ export const AuthProvider = ({ children }) => {
       const newWrappedKey = await wrapKey(encryptionKey, newBackupKey);
       const updateRes = await api.post('/auth/recover', {
         email, newPassword, newKeySalt, newWrappedKey,
+        currentRecoverySalt: recoverySalt,  // server requires this to verify recovery flow
       });
       localStorage.setItem('nf_token', updateRes.data.token);
       localStorage.setItem('nf_user', JSON.stringify(updateRes.data.user));

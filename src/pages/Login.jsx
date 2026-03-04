@@ -25,7 +25,9 @@ export default function Login() {
     try {
       await login(email, form.password);
       clearGuestDocs();
-      navigate(params.get('redirect') || '/dashboard');
+      // Only follow relative redirect paths (must start with '/') to prevent open redirect
+      const redirect = params.get('redirect');
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/dashboard');
     } catch (err) {
       setError(err?.message || 'Login failed');
     } finally {
@@ -79,6 +81,9 @@ export default function Login() {
 
         <p className={styles.switchLink}>
           Do not have an account? <Link to="/signup">Sign up free</Link>
+        </p>
+        <p className={styles.switchLink}>
+          Forgot your password? <Link to="/recover">Recover with key</Link>
         </p>
       </div>
     </div>

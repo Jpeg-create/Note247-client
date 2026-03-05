@@ -648,7 +648,7 @@
 /* Secondary features grid */
 .featuresGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -1049,8 +1049,13 @@
 .footerLink:hover { color: var(--text-dim); }
 
 /* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .featuresGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 768px) {
   .featuresHeroGrid { grid-template-columns: 1fr; }
+  .featuresGrid { grid-template-columns: 1fr; }
   .e2eeInner { grid-template-columns: 1fr; }
   .e2eeLeft { border-right: none; border-bottom: 1px solid rgba(232,255,71,0.12); }
   .e2eeFlow { justify-content: center; }

@@ -27,7 +27,7 @@ function useTicker(target, suffix = '', active = false) {
   return display;
 }
 
-// ── Stat card with cursor spotlight ───────────────────────────────────────
+// ── Stat card ───────────────────────────────────────────────────────────────
 function StatCard({ icon, target, suffix = '', label, delta, deltaDown = false, featured = false, tickActive = false }) {
   const val = useTicker(target, suffix, tickActive);
   const ref = useRef(null);
@@ -48,8 +48,8 @@ function StatCard({ icon, target, suffix = '', label, delta, deltaDown = false, 
   );
 }
 
-// ── Feature card with cursor spotlight ────────────────────────────────────
-function FeatureCard({ icon, title, desc, featured = false }) {
+// ── Feature card ────────────────────────────────────────────────────────────
+function FeatureCard({ icon, title, desc, featured = false, heroCard = false }) {
   const ref = useRef(null);
   const onMove = e => {
     const r = ref.current.getBoundingClientRect();
@@ -58,25 +58,154 @@ function FeatureCard({ icon, title, desc, featured = false }) {
   };
   const onLeave = () => { ref.current.style.setProperty('--mx', '50%'); ref.current.style.setProperty('--my', '50%'); };
   return (
-    <div ref={ref} className={`${styles.featureCard} ${featured ? styles.featureCardFeatured : ''}`} onMouseMove={onMove} onMouseLeave={onLeave}>
-      <div className={`${styles.featureIconWrap} ${featured ? styles.featureIconFeatured : ''}`}>{icon}</div>
-      <h3 className={styles.featureTitle}>
-        {title}
-        {featured && <span className={styles.featureBadge}>Zero-knowledge</span>}
-      </h3>
-      <p className={styles.featureDesc}>{desc}</p>
+    <div ref={ref} className={`${styles.featureCard} ${featured ? styles.featureCardFeatured : ''} ${heroCard ? styles.featureCardHero : ''}`} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <div className={`${styles.featureIconWrap} ${featured ? styles.featureIconFeatured : ''} ${heroCard ? styles.featureIconHero : ''}`}>{icon}</div>
+      <div>
+        <h3 className={styles.featureTitle}>
+          {title}
+          {featured && <span className={styles.featureBadge}>Zero-knowledge</span>}
+        </h3>
+        <p className={styles.featureDesc}>{desc}</p>
+      </div>
     </div>
   );
 }
 
-const FEATURES = [
-  { icon: '🔐', title: 'End-to-End Encrypted',   desc: 'Your documents are encrypted in your browser before reaching our servers. We store only ciphertext — even we cannot read your notes.', featured: true },
-  { icon: '✍️', title: 'Rich Text & Code',        desc: 'Switch between a beautiful rich text editor and a full syntax-highlighted code editor — your choice.' },
-  { icon: '🤝', title: 'Real-time Collaboration', desc: 'Work together with your team, see changes instantly from anywhere in the world.' },
-  { icon: '🔒', title: 'Password Protection',     desc: 'Lock any document with a password. Your sensitive notes stay private.' },
-  { icon: '🕑', title: 'Version History',         desc: 'Never lose your work. Browse and restore any previous save with one click.' },
-  { icon: '✨', title: 'AI Assistant',            desc: 'Fix bugs, summarize, translate, or generate a first draft — right inside the editor.' },
-  { icon: '📄', title: 'PDF Export',              desc: 'Export any document as a polished PDF with one click.' },
+// ── Animated editor preview ─────────────────────────────────────────────────
+const PREVIEW_LINES = [
+  { text: '# Meeting Notes — Q2 Planning', type: 'h1', delay: 0 },
+  { text: '', type: 'empty', delay: 300 },
+  { text: '## Goals for this quarter', type: 'h2', delay: 500 },
+  { text: '- Launch the new onboarding flow', type: 'bullet', delay: 900 },
+  { text: '- Hit 10k active users by June', type: 'bullet', delay: 1300 },
+  { text: '- Ship mobile app v1', type: 'bullet', delay: 1700 },
+  { text: '', type: 'empty', delay: 2000 },
+  { text: '## Action items', type: 'h2', delay: 2200 },
+  { text: '- [ ] Review designs with team', type: 'todo', delay: 2600 },
+  { text: '- [x] Set up CI/CD pipeline', type: 'done', delay: 3000 },
+];
+
+function EditorPreview({ active }) {
+  const [visibleLines, setVisibleLines] = useState(0);
+  const [collabVisible, setCollabVisible] = useState(false);
+  const [aiVisible, setAiVisible] = useState(false);
+  const [savedVisible, setSavedVisible] = useState(false);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!active || startedRef.current) return;
+    startedRef.current = true;
+    const timers = [];
+    const T = (fn, ms) => timers.push(setTimeout(fn, ms));
+    PREVIEW_LINES.forEach((_, i) => T(() => setVisibleLines(i + 1), PREVIEW_LINES[i].delay + 200));
+    T(() => setCollabVisible(true), 2400);
+    T(() => setAiVisible(true), 3200);
+    T(() => setSavedVisible(true), 3800);
+    return () => timers.forEach(clearTimeout);
+  }, [active]);
+
+  return (
+    <div className={styles.previewShell}>
+      {/* Title bar */}
+      <div className={styles.previewTitleBar}>
+        <div className={styles.previewDots}>
+          <span className={styles.pdot} style={{ background: '#ff5f57' }} />
+          <span className={styles.pdot} style={{ background: '#febc2e' }} />
+          <span className={styles.pdot} style={{ background: '#28c840' }} />
+        </div>
+        <span className={styles.previewFilename}>meeting-notes.md</span>
+        <span className={`${styles.previewSaved} ${savedVisible ? styles.previewSavedShow : ''}`}>✓ Saved</span>
+      </div>
+
+      {/* Toolbar */}
+      <div className={styles.previewToolbar}>
+        <span className={styles.previewLogo}>Note<span>247</span></span>
+        <div className={styles.ptSep} />
+        <span className={styles.ptBtn}>B</span>
+        <span className={styles.ptBtn}><em>I</em></span>
+        <span className={styles.ptBtn}>H₁</span>
+        <span className={styles.ptBtn}>🔗</span>
+        <div style={{ flex: 1 }} />
+        <div className={`${styles.previewCollab} ${collabVisible ? styles.previewCollabShow : ''}`}>
+          <div className={styles.pAvatar} style={{ background: '#47ffb822', color: '#47ffb8', borderColor: '#47ffb844' }}>A</div>
+          <div className={styles.pAvatar} style={{ background: '#ff6b9d22', color: '#ff6b9d', borderColor: '#ff6b9d44' }}>M</div>
+          <span className={styles.pCollabText}>2 editing</span>
+        </div>
+        <div className={`${styles.previewAIBtn} ${aiVisible ? styles.previewAIBtnShow : ''}`}>✨ AI</div>
+      </div>
+
+      {/* Body */}
+      <div className={styles.previewBody}>
+        <div className={styles.previewGutter}>
+          {Array.from({ length: visibleLines }).map((_, i) => (
+            <span key={i} className={styles.previewLineNum}>{i + 1}</span>
+          ))}
+        </div>
+        <div className={styles.previewContent}>
+          {PREVIEW_LINES.slice(0, visibleLines).map((line, i) => (
+            <div key={i} className={`${styles.previewLine} ${styles['pline_' + line.type]}`}>
+              {line.text}
+              {i === visibleLines - 1 && <span className={styles.previewCaret} />}
+            </div>
+          ))}
+          {collabVisible && (
+            <div className={styles.collabCursor}>
+              <div className={styles.collabCursorBar} />
+              <span className={styles.collabCursorLabel}>Alex is here</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Status bar */}
+      <div className={styles.previewStatus}>
+        <span>Markdown</span>
+        <span className={styles.pStatusSep} />
+        <span>UTF-8</span>
+        <div style={{ flex: 1 }} />
+        <span className={styles.previewE2EE}>🔐 E2E Encrypted</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Testimonials ────────────────────────────────────────────────────────────
+const TESTIMONIALS = [
+  {
+    text: "Finally a notes app that doesn't treat my data like a product. The real-time collab is buttery smooth.",
+    name: 'Sarah K.', role: 'Product Designer', avatar: 'S', color: '#ff6b9d',
+  },
+  {
+    text: "I switched from Notion for the encryption alone. The code editor with syntax highlighting is a huge bonus.",
+    name: 'James R.', role: 'Backend Engineer', avatar: 'J', color: '#47ffb8',
+  },
+  {
+    text: "My whole team uses it for shared docs now. Version history has saved us more than once.",
+    name: 'Priya M.', role: 'Engineering Manager', avatar: 'P', color: '#e8ff47',
+  },
+];
+
+const FEATURES_HERO = [
+  {
+    icon: '🔐',
+    title: 'End-to-End Encrypted',
+    desc: 'Your documents are encrypted in your browser before reaching our servers. We store only ciphertext — even we cannot read your notes.',
+    featured: true,
+  },
+  {
+    icon: '🤝',
+    title: 'Real-time Collaboration',
+    desc: 'See exactly where your teammates are editing, the moment they type. No refresh. No conflicts. Just flow.',
+    heroCard: true,
+  },
+];
+
+const FEATURES_SECONDARY = [
+  { icon: '✍️', title: 'Rich Text & Code', desc: 'Switch between a beautiful rich text editor and a full syntax-highlighted code editor — your choice.' },
+  { icon: '🔒', title: 'Password Protection', desc: 'Lock any document with a password. Your sensitive notes stay private.' },
+  { icon: '🕑', title: 'Version History', desc: 'Never lose your work. Browse and restore any previous save with one click.' },
+  { icon: '✨', title: 'AI Assistant', desc: 'Fix bugs, summarize, translate, or draft your first ideas — right inside the editor.' },
+  { icon: '📄', title: 'PDF Export', desc: 'Export any document as a polished PDF with one click.' },
 ];
 
 const STATS = [
@@ -86,15 +215,16 @@ const STATS = [
   { icon: '⚡', target: 14,    suffix: 'ms', label: 'Avg. save latency', delta: 'p99 · 38ms', deltaDown: true },
 ];
 
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Main ────────────────────────────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isGuest, limitReached, remaining, addGuestDoc } = useGuestSession();
+  const { isGuest, limitReached, addGuestDoc } = useGuestSession();
   const [actionError, setActionError] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
+  const previewRef = useRef(null);
+  const [previewActive, setPreviewActive] = useState(false);
 
-  // Animation state
   const [navVisible,     setNavVisible]     = useState(false);
   const [badgeVisible,   setBadgeVisible]   = useState(false);
   const [typedText,      setTypedText]      = useState('');
@@ -105,10 +235,10 @@ export default function Home() {
   const [statsVisible,   setStatsVisible]   = useState(false);
   const [tickActive,     setTickActive]     = useState(false);
   const [cardVisible,    setCardVisible]    = useState([false, false, false, false]);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
-  // ── Entrance sequence ────────────────────────────────────────────────────
   useEffect(() => {
-    const TARGET = 'Write anything.';
+    const TARGET = 'Think it. Write it.';
     let cancelled = false;
     const timers = [];
     const T = (fn, ms) => { const id = setTimeout(() => !cancelled && fn(), ms); timers.push(id); };
@@ -121,19 +251,19 @@ export default function Home() {
       const type = () => {
         if (cancelled) return;
         if (i >= TARGET.length) {
-          // pause then hide cursor + snap line2
           setTimeout(() => {
             if (cancelled) return;
             setShowCursor(false);
             setLine2Visible(true);
             T(() => setSubVisible(true), 120);
-            T(() => setActionsVisible(true), 220);
-            T(() => setStatsVisible(true), 360);
-            [0, 1, 2, 3].forEach(idx => {
+            T(() => setActionsVisible(true), 240);
+            T(() => { setPreviewVisible(true); setPreviewActive(true); }, 400);
+            T(() => setStatsVisible(true), 600);
+            [0,1,2,3].forEach(idx => {
               T(() => {
                 setCardVisible(prev => { const n=[...prev]; n[idx]=true; return n; });
                 if (idx === 0) setTickActive(true);
-              }, 460 + idx * 80);
+              }, 700 + idx * 80);
             });
           }, 820);
           return;
@@ -150,11 +280,25 @@ export default function Home() {
     return () => { cancelled = true; timers.forEach(clearTimeout); };
   }, []);
 
-  // ── Doc creation ─────────────────────────────────────────────────────────
+  // Intersection observer for preview section
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setPreviewActive(true);
+    }, { threshold: 0.3 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const handleNewDoc = () => {
     setActionError('');
     if (isGuest && limitReached) { navigate('/signup?reason=limit'); return; }
     setShowTemplates(true);
+  };
+
+  const handleScrollToPreview = () => {
+    previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const handleSelectTemplate = async (template) => {
@@ -213,27 +357,41 @@ export default function Home() {
             {typedText}
             {showCursor && <span className={styles.cursor} aria-hidden="true">|</span>}
           </span>
-          {/* "Share instantly." — no transition, just opacity toggled */}
           <span className={styles.snapLine} style={{ opacity: line2Visible ? 1 : 0 }}>
             Share instantly.
           </span>
         </h1>
 
         <p className={`${styles.heroSub} ${subVisible ? styles.show : ''}`}>
-          Notes, docs, code — all in one place. Collaborate in real-time,
-          stay organized, and never lose a version. No setup required.
+          The notes app that respects your privacy. Write anything — meeting notes,
+          code snippets, ideas — collaborate live, and keep it all encrypted.
+          No setup. No compromise.
         </p>
 
         <div className={`${styles.heroActions} ${actionsVisible ? styles.show : ''}`}>
-          <button className="btn accent lg" onClick={handleNewDoc}>⚡ New Document</button>
-          {isGuest && !limitReached && (
-            <span className={styles.guestNote}>
-              {remaining} free doc{remaining !== 1 ? 's' : ''} remaining as guest
-            </span>
-          )}
+          <button className="btn accent lg" onClick={handleNewDoc}>⚡ Start writing free</button>
+          <button className={`btn ghost lg ${styles.secondaryCTA}`} onClick={handleScrollToPreview}>
+            See it in action ↓
+          </button>
         </div>
 
         {actionError && <div className="form-error" role="alert">{actionError}</div>}
+
+        {isGuest && limitReached && (
+          <p className={styles.limitNote}>
+            You've used your free docs —{' '}
+            <button className={styles.limitLink} onClick={() => navigate('/signup?reason=limit')}>
+              create a free account
+            </button>{' '}
+            to continue.
+          </p>
+        )}
+      </section>
+
+      {/* ANIMATED PREVIEW */}
+      <section ref={previewRef} className={`${styles.previewSection} ${previewVisible ? styles.previewSectionVisible : ''}`}>
+        <p className={styles.statsLabel} style={{ marginBottom: 20 }}>See the editor</p>
+        <EditorPreview active={previewActive} />
       </section>
 
       {/* STATS */}
@@ -241,10 +399,7 @@ export default function Home() {
         <p className={styles.statsLabel}>Platform stats</p>
         <div className={styles.statsGrid}>
           {STATS.map((s, i) => (
-            <div
-              key={s.label}
-              className={`${styles.cardWrap} ${cardVisible[i] ? styles.cardVisible : ''}`}
-            >
+            <div key={s.label} className={`${styles.cardWrap} ${cardVisible[i] ? styles.cardVisible : ''}`}>
               <StatCard {...s} tickActive={tickActive} />
             </div>
           ))}
@@ -255,9 +410,7 @@ export default function Home() {
       <section className={styles.e2eeSection}>
         <div className={styles.e2eeInner}>
           <div className={styles.e2eeLeft}>
-            <div className={styles.e2eePill}>
-              <span>🔐</span> End-to-End Encrypted
-            </div>
+            <div className={styles.e2eePill}><span>🔐</span> End-to-End Encrypted</div>
             <h2 className={styles.e2eeTitle}>
               Your notes are yours.<br />
               <span>Not ours. Not anyone's.</span>
@@ -297,8 +450,8 @@ export default function Home() {
               </div>
             </div>
             <div className={styles.e2eeWarning}>
-              <span>⚠</span>
-              Forgot your password? Your recovery key restores access. Without either, data is unrecoverable — by design.
+              <span>🔑</span>
+              Your password is the only key. Set a recovery key at signup — it's your safety net if you ever forget.
             </div>
           </div>
         </div>
@@ -309,19 +462,68 @@ export default function Home() {
         <div className={styles.sectionHeader}>
           <p className={styles.sectionLabel}>Everything you need</p>
           <h2 className={styles.sectionTitle}>
-            Built for developers.<br />
-            <span>Loved by everyone.</span>
+            Built for focus.<br />
+            <span>Loved by teams.</span>
           </h2>
         </div>
+
+        {/* Hero-tier features — bigger, more emphasis */}
+        <div className={styles.featuresHeroGrid}>
+          {FEATURES_HERO.map(f => <FeatureCard key={f.title} {...f} />)}
+        </div>
+
+        {/* Secondary features grid */}
         <div className={styles.featuresGrid}>
-          {FEATURES.map(f => <FeatureCard key={f.title} {...f} />)}
+          {FEATURES_SECONDARY.map(f => <FeatureCard key={f.title} {...f} />)}
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className={styles.testimonialsSection}>
+        <p className={styles.sectionLabel} style={{ textAlign: 'center', marginBottom: 32 }}>What people are saying</p>
+        <div className={styles.testimonialsGrid}>
+          {TESTIMONIALS.map(t => (
+            <div key={t.name} className={styles.testimonialCard}>
+              <p className={styles.testimonialText}>"{t.text}"</p>
+              <div className={styles.testimonialAuthor}>
+                <div className={styles.testimonialAvatar} style={{ background: t.color + '22', color: t.color, borderColor: t.color + '55' }}>
+                  {t.avatar}
+                </div>
+                <div>
+                  <div className={styles.testimonialName}>{t.name}</div>
+                  <div className={styles.testimonialRole}>{t.role}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FOOTER CTA BAND */}
+      <section className={styles.footerCTA}>
+        <div className={styles.footerCTAInner}>
+          <h2 className={styles.footerCTATitle}>Your ideas deserve a safe home.</h2>
+          <p className={styles.footerCTASub}>Free to start. No credit card. Encrypted from day one.</p>
+          <div className={styles.footerCTAActions}>
+            {user ? (
+              <button className="btn accent lg" onClick={handleNewDoc}>+ New Document</button>
+            ) : (
+              <>
+                <button className="btn accent lg" onClick={() => navigate('/signup')}>Create free account →</button>
+                <button className="btn ghost lg" onClick={() => navigate('/login')}>Already have one? Log in</button>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer className={styles.footer}>
         <span>Note247 © {new Date().getFullYear()}</span>
-        {!user && <button className="btn sm ghost" onClick={() => navigate('/signup')}>Create free account</button>}
+        <div className={styles.footerLinks}>
+          <span className={styles.footerLink}>Privacy</span>
+          <span className={styles.footerLink}>Terms</span>
+        </div>
       </footer>
 
     </div>
